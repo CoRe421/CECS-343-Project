@@ -22,13 +22,17 @@ public class MyTunesGUI extends JFrame {
 
     JPanel mainPanel, buttonsPanel;
     JButton playButton, pauseButton, skipBackButton, skipForwardButton;
-    JMenuItem addSong, deleteSong, openSong, exitGUI;
+    JMenuItem addSongMenu, deleteSongMenu, addSongPopup, deleteSongPopup, openSong, exitGUI;
     JPopupMenu libPopUp;
     JTable table;
     JMenuBar menuBar;
     JMenu fileMenu;
     JScrollPane scrollPane;
     int currentSelectedRow;
+    AddSong addAction;
+    RemoveSong removeAction;
+    PlaySong playAction;
+    ExitGUI exitAction;
     PlayButtonListener playBL;
     PauseButtonListener pauseBL;
     SkipBackButtonListener skipBackBL;
@@ -72,15 +76,22 @@ public class MyTunesGUI extends JFrame {
         skipForwardButton.setMaximumSize(new Dimension(450, 25));
 
         fileMenu = new JMenu("File");
-        addSong = new JMenuItem("Add a Song");
-        deleteSong = new JMenuItem("Delete a Song");
+        addSongMenu = new JMenuItem("Add a Song");
+        deleteSongMenu = new JMenuItem("Delete a Song");
         openSong = new JMenuItem("Open a Song");
         exitGUI = new JMenuItem("Exit");
 
+        addSongPopup = new JMenuItem("Add a Song");
+        deleteSongPopup = new JMenuItem("Delete a Song");
 
-        libPopUp = new JPopupMenu();
-        libPopUp.add(addSong);
-        libPopUp.add(deleteSong);
+        addSongMenu.addActionListener(addAction);
+        deleteSongMenu.addActionListener(removeAction);
+        addSongPopup.addActionListener(addAction);
+        deleteSongPopup.addActionListener(removeAction);
+
+        libPopUp = new JPopupMenu("Test");
+        libPopUp.add(addSongPopup);
+        libPopUp.add(deleteSongPopup);
 
         MyDB songTable = new MyDB();
         songTable.connect();
@@ -94,6 +105,7 @@ public class MyTunesGUI extends JFrame {
         //Creates a new listener for the mouse attached to the table.
         MouseListener mouseListener = new MouseAdapter() {
             public void mousePressed(MouseEvent e) {
+                showPopup(e);
                 currentSelectedRow = table.getSelectedRow();
                 System.out.println("Selected index " + currentSelectedRow);
             }
@@ -105,7 +117,6 @@ public class MyTunesGUI extends JFrame {
             private void showPopup(MouseEvent e) {
                 if (e.isPopupTrigger()) {
                     libPopUp.show(e.getComponent(), e.getX(), e.getY());
-                    System.out.println("Success");
                 }
             }
         };
@@ -133,8 +144,8 @@ public class MyTunesGUI extends JFrame {
         /**
         buttonsPanel.setBackground(Color.gray);
         mainPanel.setBackground(Color.green);
-        tablePanel.setBackground(Color.blue);
          **/
+
 
         //Adds all the components to the panel.
         buttonsPanel.add(skipBackButton);
@@ -143,8 +154,8 @@ public class MyTunesGUI extends JFrame {
         buttonsPanel.add(skipForwardButton);
         mainPanel.add(scrollPane);
         mainPanel.add(buttonsPanel);
-        fileMenu.add(addSong);
-        fileMenu.add(deleteSong);
+        fileMenu.add(addSongMenu);
+        fileMenu.add(deleteSongMenu);
         fileMenu.add(openSong);
         fileMenu.add(exitGUI);
         menuBar.add(fileMenu);
@@ -258,6 +269,44 @@ public class MyTunesGUI extends JFrame {
             }
         }
     }
+
+    class AddSong implements ActionListener {
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+
+
+        }
+    }
+
+    class RemoveSong implements ActionListener {
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+
+
+        }
+    }
+
+    class PlaySong implements ActionListener {
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+
+
+        }
+    }
+
+    class ExitGUI implements ActionListener {
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+
+
+        }
+    }
+
+
 
     class MyDropTarget extends DropTarget {
         public  void drop(DropTargetDropEvent evt) {
