@@ -1,3 +1,7 @@
+import com.mpatric.mp3agic.ID3v1;
+import com.mpatric.mp3agic.InvalidDataException;
+import com.mpatric.mp3agic.Mp3File;
+import com.mpatric.mp3agic.UnsupportedTagException;
 import javazoom.jlgui.basicplayer.BasicPlayer;
 import javazoom.jlgui.basicplayer.BasicPlayerException;
 
@@ -9,6 +13,8 @@ import java.awt.dnd.DnDConstants;
 import java.awt.dnd.DropTarget;
 import java.awt.dnd.DropTargetDropEvent;
 import java.awt.event.*;
+import java.io.File;
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.sql.SQLException;
@@ -37,7 +43,7 @@ public class MyTunesGUI extends JFrame {
     PauseButtonListener pauseBL;
     SkipBackButtonListener skipBackBL;
     SkipForwardButtonListener skipForwardBL;
-    public MyTunesGUI() throws SQLException {
+    public MyTunesGUI() throws SQLException, InvalidDataException, IOException, UnsupportedTagException {
         player = new BasicPlayer();
         mainPanel = new JPanel();
         buttonsPanel = new JPanel();
@@ -84,12 +90,19 @@ public class MyTunesGUI extends JFrame {
         addSongPopup = new JMenuItem("Add a Song");
         deleteSongPopup = new JMenuItem("Delete a Song");
 
+        addAction = new AddSong();
+        removeAction = new RemoveSong();
+        playAction = new PlaySong();
+        exitAction = new ExitGUI();
+
         addSongMenu.addActionListener(addAction);
         deleteSongMenu.addActionListener(removeAction);
+        openSong.addActionListener(playAction);
+        exitGUI.addActionListener(exitAction);
         addSongPopup.addActionListener(addAction);
         deleteSongPopup.addActionListener(removeAction);
 
-        libPopUp = new JPopupMenu("Test");
+        libPopUp = new JPopupMenu();
         libPopUp.add(addSongPopup);
         libPopUp.add(deleteSongPopup);
 
@@ -161,7 +174,7 @@ public class MyTunesGUI extends JFrame {
         menuBar.add(fileMenu);
         this.setJMenuBar(menuBar);
         this.setTitle("StreamPlayer by Cory Reardon");//change the name to yours
-        this.setSize(400, 150);
+        this.setSize(600, 350);
         this.add(mainPanel);
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     }
@@ -171,23 +184,18 @@ public class MyTunesGUI extends JFrame {
         @Override
         public void actionPerformed(ActionEvent e) {
 
-            String url = null;
-
-            //If there is a row selected on the table, sets url to that element.
+            File selectedSong = null;
             if (table.getSelectedRow() != -1) {
-                url = (String)table.getValueAt(currentSelectedRow, 0);
+                selectedSong = (File)table.getValueAt(currentSelectedRow, 4);
+                try {
+                    player.open(selectedSong);
+                    player.play();
+                } catch (BasicPlayerException basicPlayerException) {
+                    basicPlayerException.printStackTrace();
+                }
             }
-
-            //Attempts to play the url.
-            try {
-                player.open(new URL(url));
-                player.play();
-            } catch (MalformedURLException ex) {
-                Logger.getLogger(MyTunesGUI.class.getName()).log(Level.SEVERE, null, ex);
-                System.out.println("Malformed url");
-            } catch (BasicPlayerException ex) {
-                System.out.println("BasicPlayer exception");
-                Logger.getLogger(MyTunesGUI.class.getName()).log(Level.SEVERE, null, ex);
+            else {
+                System.out.println("No row selected.");
             }
         }
     }
@@ -197,24 +205,7 @@ public class MyTunesGUI extends JFrame {
         @Override
         public void actionPerformed(ActionEvent e) {
 
-            String url = null;
 
-            //If there is a row selected on the table, sets url to that element.
-            if (table.getSelectedRow() != -1) {
-                url = (String)table.getValueAt(currentSelectedRow, 0);
-            }
-
-            //Attempts to play the url.
-            try {
-                player.open(new URL(url));
-                player.play();
-            } catch (MalformedURLException ex) {
-                Logger.getLogger(MyTunesGUI.class.getName()).log(Level.SEVERE, null, ex);
-                System.out.println("Malformed url");
-            } catch (BasicPlayerException ex) {
-                System.out.println("BasicPlayer exception");
-                Logger.getLogger(MyTunesGUI.class.getName()).log(Level.SEVERE, null, ex);
-            }
         }
     }
 
@@ -223,24 +214,8 @@ public class MyTunesGUI extends JFrame {
         @Override
         public void actionPerformed(ActionEvent e) {
 
-            String url = null;
 
-            //If there is a row selected on the table, sets url to that element.
-            if (table.getSelectedRow() != -1) {
-                url = (String)table.getValueAt(currentSelectedRow, 0);
-            }
 
-            //Attempts to play the url.
-            try {
-                player.open(new URL(url));
-                player.play();
-            } catch (MalformedURLException ex) {
-                Logger.getLogger(MyTunesGUI.class.getName()).log(Level.SEVERE, null, ex);
-                System.out.println("Malformed url");
-            } catch (BasicPlayerException ex) {
-                System.out.println("BasicPlayer exception");
-                Logger.getLogger(MyTunesGUI.class.getName()).log(Level.SEVERE, null, ex);
-            }
         }
     }
 
@@ -249,24 +224,7 @@ public class MyTunesGUI extends JFrame {
         @Override
         public void actionPerformed(ActionEvent e) {
 
-            String url = null;
 
-            //If there is a row selected on the table, sets url to that element.
-            if (table.getSelectedRow() != -1) {
-                url = (String)table.getValueAt(currentSelectedRow, 0);
-            }
-
-            //Attempts to play the url.
-            try {
-                player.open(new URL(url));
-                player.play();
-            } catch (MalformedURLException ex) {
-                Logger.getLogger(MyTunesGUI.class.getName()).log(Level.SEVERE, null, ex);
-                System.out.println("Malformed url");
-            } catch (BasicPlayerException ex) {
-                System.out.println("BasicPlayer exception");
-                Logger.getLogger(MyTunesGUI.class.getName()).log(Level.SEVERE, null, ex);
-            }
         }
     }
 
@@ -274,7 +232,29 @@ public class MyTunesGUI extends JFrame {
 
         @Override
         public void actionPerformed(ActionEvent e) {
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setCurrentDirectory(new File(System.getProperty("user.home")));
 
+            int result = fileChooser.showOpenDialog(fileMenu);
+            if (result == JFileChooser.APPROVE_OPTION) {
+                File selectedFile = fileChooser.getSelectedFile();
+                System.out.println("Selected file: " + selectedFile.getAbsolutePath());
+                try {
+                    Mp3File selectedSong = new Mp3File(selectedFile);
+                    ID3v1 id3v1tag = selectedSong.getId3v1Tag();
+                    String songTitle = id3v1tag.getTitle();
+                    String songArtist = id3v1tag.getArtist();
+                    int songGenre = id3v1tag.getGenre();
+                    String songAYear = id3v1tag.getYear();
+                    File songDirect = selectedFile;
+                } catch (IOException ioException) {
+                    ioException.printStackTrace();
+                } catch (UnsupportedTagException unsupportedTagException) {
+                    unsupportedTagException.printStackTrace();
+                } catch (InvalidDataException invalidDataException) {
+                    invalidDataException.printStackTrace();
+                }
+            }
 
         }
     }
@@ -292,7 +272,20 @@ public class MyTunesGUI extends JFrame {
 
         @Override
         public void actionPerformed(ActionEvent e) {
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setCurrentDirectory(new File(System.getProperty("user.home")));
 
+            int result = fileChooser.showOpenDialog(fileMenu);
+            if (result == JFileChooser.APPROVE_OPTION) {
+                File selectedFile = fileChooser.getSelectedFile();
+                System.out.println("Selected file: " + selectedFile.getAbsolutePath());
+                try {
+                    player.open(selectedFile);
+                    player.play();
+                } catch (BasicPlayerException basicPlayerException) {
+                    basicPlayerException.printStackTrace();
+                }
+            }
 
         }
     }
@@ -301,8 +294,7 @@ public class MyTunesGUI extends JFrame {
 
         @Override
         public void actionPerformed(ActionEvent e) {
-
-
+            System.exit(0);
         }
     }
 
