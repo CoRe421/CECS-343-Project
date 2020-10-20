@@ -183,20 +183,29 @@ public class MyTunesGUI extends JFrame {
 
         @Override
         public void actionPerformed(ActionEvent e) {
-
-            File selectedSong = null;
-            if (table.getSelectedRow() != -1) {
-                selectedSong = (File)table.getValueAt(currentSelectedRow, 4);
+            if (player.getStatus() == 1) {
                 try {
-                    player.open(selectedSong);
-                    player.play();
+                    player.resume();
                 } catch (BasicPlayerException basicPlayerException) {
                     basicPlayerException.printStackTrace();
                 }
             }
             else {
-                System.out.println("No row selected.");
+                File selectedSong = null;
+                if (table.getSelectedRow() != -1) {
+                    selectedSong = (File)table.getValueAt(currentSelectedRow, 4);
+                    try {
+                        player.open(selectedSong);
+                        player.play();
+                    } catch (BasicPlayerException basicPlayerException) {
+                        basicPlayerException.printStackTrace();
+                    }
+                }
+                else {
+                    System.out.println("No row selected.");
+                }
             }
+
         }
     }
 
@@ -204,7 +213,21 @@ public class MyTunesGUI extends JFrame {
 
         @Override
         public void actionPerformed(ActionEvent e) {
-
+            System.out.println(player.getStatus());
+            if (player.getStatus() == 0) {
+                try {
+                    player.pause();
+                } catch (BasicPlayerException basicPlayerException) {
+                    basicPlayerException.printStackTrace();
+                }
+            }
+            else if (player.getStatus() == 1) {
+                try {
+                    player.resume();
+                } catch (BasicPlayerException basicPlayerException) {
+                    basicPlayerException.printStackTrace();
+                }
+            }
 
         }
     }
