@@ -1,7 +1,4 @@
-import com.mpatric.mp3agic.ID3v1;
-import com.mpatric.mp3agic.InvalidDataException;
-import com.mpatric.mp3agic.Mp3File;
-import com.mpatric.mp3agic.UnsupportedTagException;
+import com.mpatric.mp3agic.*;
 import javazoom.jlgui.basicplayer.BasicPlayer;
 import javazoom.jlgui.basicplayer.BasicPlayerException;
 
@@ -264,12 +261,29 @@ public class MyTunesGUI extends JFrame {
                 System.out.println("Selected file: " + selectedFile.getAbsolutePath());
                 try {
                     Mp3File selectedSong = new Mp3File(selectedFile);
-                    ID3v1 id3v1tag = selectedSong.getId3v1Tag();
-                    String songTitle = id3v1tag.getTitle();
-                    String songArtist = id3v1tag.getArtist();
-                    int songGenre = id3v1tag.getGenre();
-                    String songAYear = id3v1tag.getYear();
-                    File songDirect = selectedFile;
+
+                    if (selectedSong.hasId3v1Tag()) {
+                        ID3v1 idTag = selectedSong.getId3v1Tag();
+                        String songTitle = idTag.getTitle();
+                        String songArtist = idTag.getArtist();
+                        int songGenre = idTag.getGenre();
+                        String songAYear = idTag.getYear();
+                        File songDirect = selectedFile;
+                    }
+                    else if (selectedSong.hasId3v2Tag()) {
+                        ID3v2 idTag = selectedSong.getId3v2Tag();
+                        String songTitle = idTag.getTitle();
+                        String songArtist = idTag.getArtist();
+                        int songGenre = idTag.getGenre();
+                        String songAYear = idTag.getYear();
+                        File songDirect = selectedFile;
+                    }
+                    else if (selectedSong.hasCustomTag()) {
+                        System.out.println("Your song has a custom tag and will not work.");
+                    }
+                    else {
+                        System.out.println("Song type not compatible");
+                    }
                 } catch (IOException ioException) {
                     ioException.printStackTrace();
                 } catch (UnsupportedTagException unsupportedTagException) {
