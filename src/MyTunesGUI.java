@@ -3,6 +3,7 @@ import javazoom.jlgui.basicplayer.BasicPlayer;
 import javazoom.jlgui.basicplayer.BasicPlayerException;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
 import java.awt.*;
 import java.awt.datatransfer.DataFlavor;
@@ -14,7 +15,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
@@ -40,6 +41,10 @@ public class MyTunesGUI extends JFrame {
     PauseButtonListener pauseBL;
     SkipBackButtonListener skipBackBL;
     SkipForwardButtonListener skipForwardBL;
+    MyDB songTable;
+    String[][] data;
+    String[] columns = {"Title", "Artist", "Genre", "Release Year", "ID"};;
+    int numOfSongs;
     public MyTunesGUI() throws SQLException, InvalidDataException, IOException, UnsupportedTagException {
         player = new BasicPlayer();
         mainPanel = new JPanel();
@@ -103,13 +108,18 @@ public class MyTunesGUI extends JFrame {
         libPopUp.add(addSongPopup);
         libPopUp.add(deleteSongPopup);
 
-        MyDB songTable = new MyDB();
+        songTable = new MyDB();
         songTable.connect();
         //The set of data that will be in the table.
-        String[] columns = {"Title", "Artist", "Genre", "Release Year", "ID"};
-        String[][] data = new String[20][5];
+        data = new String[20][5];
         songTable.getSongs(data);
-
+        numOfSongs = 0;
+        while (data[numOfSongs][0] == null) {
+            numOfSongs++;
+            if (numOfSongs == data.length / 5) {
+                break;
+            }
+        }
         table = new JTable(data, columns);
 
         //Creates a new listener for the mouse attached to the table.
@@ -190,7 +200,8 @@ public class MyTunesGUI extends JFrame {
             else {
                 File selectedSong = null;
                 if (table.getSelectedRow() != -1) {
-                    selectedSong = (File)table.getValueAt(currentSelectedRow, 4);
+                    String filePath = (String)table.getValueAt(currentSelectedRow, 4);
+                    selectedSong = new File(filePath);
                     try {
                         player.open(selectedSong);
                         player.play();
@@ -233,7 +244,18 @@ public class MyTunesGUI extends JFrame {
 
         @Override
         public void actionPerformed(ActionEvent e) {
-
+            if (player.getStatus() == 1 || player.getStatus() == 0) {
+                if (--currentSelectedRow == -1) {
+                    currentSelectedRow = numOfSongs - 1;
+                }
+                File selectedSong = (File)table.getValueAt(currentSelectedRow, 4);
+                try {
+                    player.open(selectedSong);
+                    player.play();
+                } catch (BasicPlayerException basicPlayerException) {
+                    basicPlayerException.printStackTrace();
+                }
+            }
 
 
         }
@@ -243,7 +265,18 @@ public class MyTunesGUI extends JFrame {
 
         @Override
         public void actionPerformed(ActionEvent e) {
-
+            if (player.getStatus() == 1 || player.getStatus() == 0) {
+                if (numOfSongs == (data.length / 5) || table.getValueAt(++currentSelectedRow, 4) == null) {
+                    currentSelectedRow = 0;
+                }
+                File selectedSong = (File)table.getValueAt(currentSelectedRow, 4);
+                try {
+                    player.open(selectedSong);
+                    player.play();
+                } catch (BasicPlayerException basicPlayerException) {
+                    basicPlayerException.printStackTrace();
+                }
+            }
 
         }
     }
@@ -260,39 +293,18 @@ public class MyTunesGUI extends JFrame {
                 File selectedFile = fileChooser.getSelectedFile();
                 System.out.println("Selected file: " + selectedFile.getAbsolutePath());
                 try {
-                    Mp3File selectedSong = new Mp3File(selectedFile);
-
-                    if (selectedSong.hasId3v1Tag()) {
-                        ID3v1 idTag = selectedSong.getId3v1Tag();
-                        String songTitle = idTag.getTitle();
-                        String songArtist = idTag.getArtist();
-                        int songGenre = idTag.getGenre();
-                        String songAYear = idTag.getYear();
-                        File songDirect = selectedFile;
-                    }
-                    else if (selectedSong.hasId3v2Tag()) {
-                        ID3v2 idTag = selectedSong.getId3v2Tag();
-                        String songTitle = idTag.getTitle();
-                        String songArtist = idTag.getArtist();
-                        int songGenre = idTag.getGenre();
-                        String songAYear = idTag.getYear();
-                        File songDirect = selectedFile;
-                    }
-                    else if (selectedSong.hasCustomTag()) {
-                        System.out.println("Your song has a custom tag and will not work.");
-                    }
-                    else {
-                        System.out.println("Song type not compatible");
-                    }
+                    songTable.addSong(selectedFile);
+                    songTable.getSongs(data);
+                } catch (InvalidDataException invalidDataException) {
+                    invalidDataException.printStackTrace();
                 } catch (IOException ioException) {
                     ioException.printStackTrace();
                 } catch (UnsupportedTagException unsupportedTagException) {
                     unsupportedTagException.printStackTrace();
-                } catch (InvalidDataException invalidDataException) {
-                    invalidDataException.printStackTrace();
+                } catch (SQLException throwables) {
+                    throwables.printStackTrace();
                 }
             }
-
         }
     }
 
@@ -300,8 +312,21 @@ public class MyTunesGUI extends JFrame {
 
         @Override
         public void actionPerformed(ActionEvent e) {
-
-
+            File selectedSong = null;
+            String filePath = (String)table.getValueAt(currentSelectedRow, 4);
+            selectedSong = new File(filePath);
+            try {
+                songTable.RemoveSong(selectedSong);
+                songTable.getSongs(data);
+            } catch (InvalidDataException invalidDataException) {
+                invalidDataException.printStackTrace();
+            } catch (IOException ioException) {
+                ioException.printStackTrace();
+            } catch (UnsupportedTagException unsupportedTagException) {
+                unsupportedTagException.printStackTrace();
+            } catch (SQLException throwables) {
+                throwables.printStackTrace();
+            }
         }
     }
 
@@ -341,14 +366,12 @@ public class MyTunesGUI extends JFrame {
         public  void drop(DropTargetDropEvent evt) {
             try {
                 evt.acceptDrop(DnDConstants.ACTION_COPY);
-
-                java.util.List result = new ArrayList();
-                result = (List) evt.getTransferable().getTransferData(DataFlavor.javaFileListFlavor);
-
-
-                for(Object o : result)
-                    System.out.println(o.toString());
-
+                List<File> result = (List) evt.getTransferable().getTransferData(DataFlavor.javaFileListFlavor);
+                for(File o : result) {
+                    songTable.addSong(o);
+                    numOfSongs++;
+                }
+                songTable.getSongs(data);
             }
             catch (Exception ex){
                 ex.printStackTrace();

@@ -11,5 +11,6 @@
     <orderEntry type="library" name="commons-logging-api" level="project" />
     <orderEntry type="library" name="mysql-connector-java-8.0.21" level="project" />
     <orderEntry type="library" name="mp3agic-0.9.2" level="project" />
+    <orderEntry type="library" name="rs2xml" level="project" />
   </component>
 </module>
