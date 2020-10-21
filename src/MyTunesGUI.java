@@ -1,8 +1,6 @@
 import com.mpatric.mp3agic.*;
 import javazoom.jlgui.basicplayer.BasicPlayer;
 import javazoom.jlgui.basicplayer.BasicPlayerException;
-import javazoom.spi.mpeg.sampled.file.tag.MP3Tag;
-
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
@@ -14,13 +12,9 @@ import java.awt.dnd.DropTargetDropEvent;
 import java.awt.event.*;
 import java.io.File;
 import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 public class MyTunesGUI extends JFrame {
     BasicPlayer player;
@@ -44,12 +38,10 @@ public class MyTunesGUI extends JFrame {
     PauseButtonListener pauseBL;
     SkipBackButtonListener skipBackBL;
     SkipForwardButtonListener skipForwardBL;
-    String[][] data = new String[20][6];
-
     String[] columns = {"Title", "Artist", "Album", "Genre", "Release Year", "Comment"};
     MyDB songTable = new MyDB();
 
-    public MyTunesGUI() throws SQLException, InvalidDataException, IOException, UnsupportedTagException {
+    public MyTunesGUI() {
         player = new BasicPlayer();
         mainPanel = new JPanel();
         buttonsPanel = new JPanel();
@@ -57,7 +49,6 @@ public class MyTunesGUI extends JFrame {
 
         //Creates the panel with a vertical layout.
         mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.Y_AXIS));
-
         buttonsPanel.setLayout(new FlowLayout());
 
         //Creates a Button Listener to attach to the playButton.
@@ -120,8 +111,9 @@ public class MyTunesGUI extends JFrame {
         model.setColumnIdentifiers(columns);
         table = new JTable();
         table.setModel(model);
-        //table = new JTable(data, columns);
+
         showSongs();
+
         //Creates a new listener for the mouse attached to the table.
         MouseListener mouseListener = new MouseAdapter() {
             public void mousePressed(MouseEvent e) {
@@ -161,12 +153,6 @@ public class MyTunesGUI extends JFrame {
         buttonsPanel.setMaximumSize(new Dimension(getWidth(), 40));
         table.setPreferredSize(new Dimension(getWidth(), getHeight()));
 
-        /**
-         buttonsPanel.setBackground(Color.gray);
-         mainPanel.setBackground(Color.green);
-         **/
-
-
         //Adds all the components to the panel.
         buttonsPanel.add(skipBackButton);
         buttonsPanel.add(playButton);
@@ -190,7 +176,7 @@ public class MyTunesGUI extends JFrame {
         ArrayList<Song> list = songTable.songList();
         DefaultTableModel model = (DefaultTableModel) table.getModel();
         Object[] row = new Object[6];
-        for(int i = 0 ; i < list.size() ; i ++){
+        for (int i = 0 ; i < list.size() ; i ++) {
             row[0] = list.get(i).getTitle();
             row[1] = list.get(i).getArtist();
             row[2] = list.get(i).getAlbum();
@@ -213,7 +199,7 @@ public class MyTunesGUI extends JFrame {
                 }
             }
             else {
-                File selectedSong = null;
+                File selectedSong;
                 if (table.getSelectedRow() != -1) {
                     String title = (String)table.getValueAt(currentSelectedRow,0);
                     String artist = (String)table.getValueAt(currentSelectedRow,1);
@@ -274,7 +260,7 @@ public class MyTunesGUI extends JFrame {
 
         @Override
         public void actionPerformed(ActionEvent e) {
-            File selectedSong = null;
+            File selectedSong;
             String sql = "SELECT SongID FROM SONGS WHERE Title = ? AND Artist = ?";
             if(currentPlayingRow == 0){
                 String title = (String)table.getValueAt(table.getRowCount()-1,0);
@@ -331,7 +317,7 @@ public class MyTunesGUI extends JFrame {
 
         @Override
         public void actionPerformed(ActionEvent e) {
-            File selectedSong = null;
+            File selectedSong;
             String sql = "SELECT SongID FROM SONGS WHERE Title = ? AND Artist = ?";
             if(currentPlayingRow == table.getRowCount() - 1){
                 String title = (String)table.getValueAt(0,0);
@@ -439,14 +425,8 @@ public class MyTunesGUI extends JFrame {
                     row[5] = songComment;
                     model.addRow(row);
 
-                } catch (IOException ioException) {
+                } catch (IOException | InvalidDataException | UnsupportedTagException | SQLException ioException) {
                     ioException.printStackTrace();
-                } catch (UnsupportedTagException unsupportedTagException) {
-                    unsupportedTagException.printStackTrace();
-                } catch (InvalidDataException invalidDataException) {
-                    invalidDataException.printStackTrace();
-                } catch (SQLException throwables) {
-                    throwables.printStackTrace();
                 }
             }
         }
@@ -504,7 +484,6 @@ public class MyTunesGUI extends JFrame {
             try {
                 evt.acceptDrop(DnDConstants.ACTION_COPY);
                 List<File> result = (List) evt.getTransferable().getTransferData(DataFlavor.javaFileListFlavor);
-                AddSong newAdd = new AddSong();
                 for(File o : result) {
                     try {
                         Mp3File selectedSong = new Mp3File(o);
@@ -549,14 +528,8 @@ public class MyTunesGUI extends JFrame {
                         row[5] = songComment;
                         model.addRow(row);
 
-                    } catch (IOException ioException) {
+                    } catch (IOException | UnsupportedTagException | InvalidDataException | SQLException ioException) {
                         ioException.printStackTrace();
-                    } catch (UnsupportedTagException unsupportedTagException) {
-                        unsupportedTagException.printStackTrace();
-                    } catch (InvalidDataException invalidDataException) {
-                        invalidDataException.printStackTrace();
-                    } catch (SQLException throwables) {
-                        throwables.printStackTrace();
                     }
                 }
             }
