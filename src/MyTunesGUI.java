@@ -1,6 +1,7 @@
 import com.mpatric.mp3agic.*;
 import javazoom.jlgui.basicplayer.BasicPlayer;
 import javazoom.jlgui.basicplayer.BasicPlayerException;
+import javazoom.spi.mpeg.sampled.file.tag.MP3Tag;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -29,10 +30,12 @@ public class MyTunesGUI extends JFrame {
     JMenuItem addSongMenu, deleteSongMenu, addSongPopup, deleteSongPopup, openSong, exitGUI;
     JPopupMenu libPopUp;
     JTable table;
+    DefaultTableModel model = new DefaultTableModel();
     JMenuBar menuBar;
     JMenu fileMenu;
     JScrollPane scrollPane;
     int currentSelectedRow;
+    int currentPlayingRow;
     AddSong addAction;
     RemoveSong removeAction;
     PlaySong playAction;
@@ -41,10 +44,11 @@ public class MyTunesGUI extends JFrame {
     PauseButtonListener pauseBL;
     SkipBackButtonListener skipBackBL;
     SkipForwardButtonListener skipForwardBL;
-    MyDB songTable;
-    String[][] data;
-    String[] columns = {"Title", "Artist", "Genre", "Release Year", "ID"};;
-    int numOfSongs;
+    String[][] data = new String[20][6];
+
+    String[] columns = {"Title", "Artist", "Album", "Genre", "Release Year", "Comment"};
+    MyDB songTable = new MyDB();
+
     public MyTunesGUI() throws SQLException, InvalidDataException, IOException, UnsupportedTagException {
         player = new BasicPlayer();
         mainPanel = new JPanel();
@@ -108,20 +112,16 @@ public class MyTunesGUI extends JFrame {
         libPopUp.add(addSongPopup);
         libPopUp.add(deleteSongPopup);
 
-        songTable = new MyDB();
+
         songTable.connect();
         //The set of data that will be in the table.
-        data = new String[20][5];
-        songTable.getSongs(data);
-        numOfSongs = 0;
-        while (data[numOfSongs][0] == null) {
-            numOfSongs++;
-            if (numOfSongs == data.length / 5) {
-                break;
-            }
-        }
-        table = new JTable(data, columns);
 
+        //songTable.getSongs(data);
+        model.setColumnIdentifiers(columns);
+        table = new JTable();
+        table.setModel(model);
+        //table = new JTable(data, columns);
+        showSongs();
         //Creates a new listener for the mouse attached to the table.
         MouseListener mouseListener = new MouseAdapter() {
             public void mousePressed(MouseEvent e) {
@@ -162,8 +162,8 @@ public class MyTunesGUI extends JFrame {
         table.setPreferredSize(new Dimension(getWidth(), getHeight()));
 
         /**
-        buttonsPanel.setBackground(Color.gray);
-        mainPanel.setBackground(Color.green);
+         buttonsPanel.setBackground(Color.gray);
+         mainPanel.setBackground(Color.green);
          **/
 
 
@@ -186,6 +186,21 @@ public class MyTunesGUI extends JFrame {
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     }
 
+    public void showSongs (){
+        ArrayList<Song> list = songTable.songList();
+        DefaultTableModel model = (DefaultTableModel) table.getModel();
+        Object[] row = new Object[6];
+        for(int i = 0 ; i < list.size() ; i ++){
+            row[0] = list.get(i).getTitle();
+            row[1] = list.get(i).getArtist();
+            row[2] = list.get(i).getAlbum();
+            row[3] = list.get(i).getGenre();
+            row[4] = list.get(i).getReleaseYear();
+            row[5] = list.get(i).getComment();
+            model.addRow(row);
+        }
+    }
+
     class PlayButtonListener implements ActionListener {
 
         @Override
@@ -200,14 +215,29 @@ public class MyTunesGUI extends JFrame {
             else {
                 File selectedSong = null;
                 if (table.getSelectedRow() != -1) {
-                    String filePath = (String)table.getValueAt(currentSelectedRow, 4);
-                    selectedSong = new File(filePath);
+                    String title = (String)table.getValueAt(currentSelectedRow,0);
+                    String artist = (String)table.getValueAt(currentSelectedRow,1);
+                    String sql = "SELECT SongID FROM SONGS WHERE Title = ? AND Artist = ?";
                     try {
-                        player.open(selectedSong);
-                        player.play();
-                    } catch (BasicPlayerException basicPlayerException) {
-                        basicPlayerException.printStackTrace();
+                        Connection connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/mytunes","root", "");
+                        PreparedStatement preparedStatement = connection.prepareStatement(sql);
+                        preparedStatement.setString(1,title);
+                        preparedStatement.setString(2,artist);
+                        ResultSet rs = preparedStatement.executeQuery();
+                        rs.next();
+                        String url = rs.getString("SongID");
+                        selectedSong = new File(url);
+                        try {
+                            player.open(selectedSong);
+                            player.play();
+                            currentPlayingRow = currentSelectedRow;
+                        } catch (BasicPlayerException basicPlayerException) {
+                            basicPlayerException.printStackTrace();
+                        }
+                    } catch (SQLException throwables) {
+                        throwables.printStackTrace();
                     }
+
                 }
                 else {
                     System.out.println("No row selected.");
@@ -244,20 +274,56 @@ public class MyTunesGUI extends JFrame {
 
         @Override
         public void actionPerformed(ActionEvent e) {
-            if (player.getStatus() == 1 || player.getStatus() == 0) {
-                if (--currentSelectedRow == -1) {
-                    currentSelectedRow = numOfSongs - 1;
-                }
-                File selectedSong = (File)table.getValueAt(currentSelectedRow, 4);
+            File selectedSong = null;
+            String sql = "SELECT SongID FROM SONGS WHERE Title = ? AND Artist = ?";
+            if(currentPlayingRow == 0){
+                String title = (String)table.getValueAt(table.getRowCount()-1,0);
+                String artist = (String)table.getValueAt(table.getRowCount()-1,1);
                 try {
-                    player.open(selectedSong);
-                    player.play();
-                } catch (BasicPlayerException basicPlayerException) {
-                    basicPlayerException.printStackTrace();
+                    Connection connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/mytunes","root", "");
+                    PreparedStatement preparedStatement = connection.prepareStatement(sql);
+                    preparedStatement.setString(1,title);
+                    preparedStatement.setString(2,artist);
+                    ResultSet rs = preparedStatement.executeQuery();
+                    rs.next();
+                    String url = rs.getString("SongID");
+                    selectedSong = new File(url);
+                    try {
+                        player.open(selectedSong);
+                        player.play();
+                        currentPlayingRow = table.getRowCount() - 1;
+                        table.setRowSelectionInterval(currentPlayingRow,currentPlayingRow);
+                    } catch (BasicPlayerException basicPlayerException) {
+                        basicPlayerException.printStackTrace();
+                    }
+                } catch (SQLException throwables) {
+                    throwables.printStackTrace();
+                }
+
+            } else {
+                String title = (String)table.getValueAt(currentPlayingRow - 1,0);
+                String artist = (String)table.getValueAt(currentPlayingRow - 1,1);
+                try {
+                    Connection connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/mytunes","root", "");
+                    PreparedStatement preparedStatement = connection.prepareStatement(sql);
+                    preparedStatement.setString(1,title);
+                    preparedStatement.setString(2,artist);
+                    ResultSet rs = preparedStatement.executeQuery();
+                    rs.next();
+                    String url = rs.getString("SongID");
+                    selectedSong = new File(url);
+                    try {
+                        player.open(selectedSong);
+                        player.play();
+                        currentPlayingRow = currentPlayingRow - 1;
+                        table.setRowSelectionInterval(currentPlayingRow,currentPlayingRow);
+                    } catch (BasicPlayerException basicPlayerException) {
+                        basicPlayerException.printStackTrace();
+                    }
+                } catch (SQLException throwables) {
+                    throwables.printStackTrace();
                 }
             }
-
-
         }
     }
 
@@ -265,16 +331,54 @@ public class MyTunesGUI extends JFrame {
 
         @Override
         public void actionPerformed(ActionEvent e) {
-            if (player.getStatus() == 1 || player.getStatus() == 0) {
-                if (numOfSongs == (data.length / 5) || table.getValueAt(++currentSelectedRow, 4) == null) {
-                    currentSelectedRow = 0;
-                }
-                File selectedSong = (File)table.getValueAt(currentSelectedRow, 4);
+            File selectedSong = null;
+            String sql = "SELECT SongID FROM SONGS WHERE Title = ? AND Artist = ?";
+            if(currentPlayingRow == table.getRowCount() - 1){
+                String title = (String)table.getValueAt(0,0);
+                String artist = (String)table.getValueAt(0,1);
                 try {
-                    player.open(selectedSong);
-                    player.play();
-                } catch (BasicPlayerException basicPlayerException) {
-                    basicPlayerException.printStackTrace();
+                    Connection connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/mytunes","root", "");
+                    PreparedStatement preparedStatement = connection.prepareStatement(sql);
+                    preparedStatement.setString(1,title);
+                    preparedStatement.setString(2,artist);
+                    ResultSet rs = preparedStatement.executeQuery();
+                    rs.next();
+                    String url = rs.getString("SongID");
+                    selectedSong = new File(url);
+                    try {
+                        player.open(selectedSong);
+                        player.play();
+                        currentPlayingRow = 0;
+                        table.setRowSelectionInterval(currentPlayingRow,currentPlayingRow);
+                    } catch (BasicPlayerException basicPlayerException) {
+                        basicPlayerException.printStackTrace();
+                    }
+                } catch (SQLException throwables) {
+                    throwables.printStackTrace();
+                }
+
+            } else {
+                String title = (String)table.getValueAt(currentPlayingRow + 1,0);
+                String artist = (String)table.getValueAt(currentPlayingRow + 1,1);
+                try {
+                    Connection connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/mytunes","root", "");
+                    PreparedStatement preparedStatement = connection.prepareStatement(sql);
+                    preparedStatement.setString(1,title);
+                    preparedStatement.setString(2,artist);
+                    ResultSet rs = preparedStatement.executeQuery();
+                    rs.next();
+                    String url = rs.getString("SongID");
+                    selectedSong = new File(url);
+                    try {
+                        player.open(selectedSong);
+                        player.play();
+                        currentPlayingRow = currentPlayingRow + 1;
+                        table.setRowSelectionInterval(currentPlayingRow,currentPlayingRow);
+                    } catch (BasicPlayerException basicPlayerException) {
+                        basicPlayerException.printStackTrace();
+                    }
+                } catch (SQLException throwables) {
+                    throwables.printStackTrace();
                 }
             }
 
@@ -293,14 +397,54 @@ public class MyTunesGUI extends JFrame {
                 File selectedFile = fileChooser.getSelectedFile();
                 System.out.println("Selected file: " + selectedFile.getAbsolutePath());
                 try {
+                    Mp3File selectedSong = new Mp3File(selectedFile);
+                    String songTitle = "", songArtist= "", songGenre= "", songAYear= "", songAlbum= "", songComment= "";
+                    if (selectedSong.hasId3v1Tag()) {
+                        ID3v1 idTag = selectedSong.getId3v1Tag();
+                        songTitle = idTag.getTitle();
+                        if (songTitle == null) songTitle = "Unknown";
+                        songArtist = idTag.getArtist();
+                        if (songArtist == null) songArtist = "Unknown";
+                        songGenre = idTag.getGenreDescription();
+                        if (songGenre == null) songGenre = "Unknown";
+                        songAYear = idTag.getYear();
+                        if (songAYear == null) songAYear = "Unknown";
+                        songAlbum = idTag.getAlbum();
+                        if (songAlbum == null) songAlbum = "Unknown";
+                        songComment = idTag.getComment();
+                        if (songComment == null) songComment = "Unknown";
+
+                    } else if (selectedSong.hasId3v2Tag()) {
+                        ID3v2 idTag = selectedSong.getId3v2Tag();
+                        songTitle = idTag.getTitle();
+                        if (songTitle == null) songTitle = "Unknown";
+                        songArtist = idTag.getArtist();
+                        if (songArtist == null) songArtist = "Unknown";
+                        songGenre = idTag.getGenreDescription();
+                        if (songGenre == null) songGenre = "Unknown";
+                        songAYear = idTag.getYear();
+                        if (songAYear == null) songAYear = "Unknown";
+                        songAlbum = idTag.getAlbum();
+                        if (songAlbum == null) songAlbum = "Unknown";
+                        songComment = idTag.getComment();
+                        if (songComment == null) songComment = "Unknown";
+                    }
                     songTable.addSong(selectedFile);
-                    songTable.getSongs(data);
-                } catch (InvalidDataException invalidDataException) {
-                    invalidDataException.printStackTrace();
+                    Object[] row = new Object[6];
+                    row[0] = songTitle;
+                    row[1] = songArtist;
+                    row[2] = songAlbum;
+                    row[3] = songGenre;
+                    row[4] = songAYear;
+                    row[5] = songComment;
+                    model.addRow(row);
+
                 } catch (IOException ioException) {
                     ioException.printStackTrace();
                 } catch (UnsupportedTagException unsupportedTagException) {
                     unsupportedTagException.printStackTrace();
+                } catch (InvalidDataException invalidDataException) {
+                    invalidDataException.printStackTrace();
                 } catch (SQLException throwables) {
                     throwables.printStackTrace();
                 }
@@ -312,18 +456,11 @@ public class MyTunesGUI extends JFrame {
 
         @Override
         public void actionPerformed(ActionEvent e) {
-            File selectedSong = null;
-            String filePath = (String)table.getValueAt(currentSelectedRow, 4);
-            selectedSong = new File(filePath);
             try {
-                songTable.RemoveSong(selectedSong);
-                songTable.getSongs(data);
-            } catch (InvalidDataException invalidDataException) {
-                invalidDataException.printStackTrace();
-            } catch (IOException ioException) {
-                ioException.printStackTrace();
-            } catch (UnsupportedTagException unsupportedTagException) {
-                unsupportedTagException.printStackTrace();
+                String title = (String)table.getValueAt(currentSelectedRow,0);
+                String artist = (String)table.getValueAt(currentSelectedRow,1);
+                songTable.removeSong(title, artist);
+                model.removeRow(currentSelectedRow);
             } catch (SQLException throwables) {
                 throwables.printStackTrace();
             }
@@ -367,16 +504,65 @@ public class MyTunesGUI extends JFrame {
             try {
                 evt.acceptDrop(DnDConstants.ACTION_COPY);
                 List<File> result = (List) evt.getTransferable().getTransferData(DataFlavor.javaFileListFlavor);
+                AddSong newAdd = new AddSong();
                 for(File o : result) {
-                    songTable.addSong(o);
-                    numOfSongs++;
+                    try {
+                        Mp3File selectedSong = new Mp3File(o);
+                        String songTitle = "", songArtist= "", songGenre= "", songAYear= "", songAlbum= "", songComment= "";
+                        if (selectedSong.hasId3v1Tag()) {
+                            ID3v1 idTag = selectedSong.getId3v1Tag();
+                            songTitle = idTag.getTitle();
+                            if (songTitle == null) songTitle = "Unknown";
+                            songArtist = idTag.getArtist();
+                            if (songArtist == null) songArtist = "Unknown";
+                            songGenre = idTag.getGenreDescription();
+                            if (songGenre == null) songGenre = "Unknown";
+                            songAYear = idTag.getYear();
+                            if (songAYear == null) songAYear = "Unknown";
+                            songAlbum = idTag.getAlbum();
+                            if (songAlbum == null) songAlbum = "Unknown";
+                            songComment = idTag.getComment();
+                            if (songComment == null) songComment = "Unknown";
+
+                        } else if (selectedSong.hasId3v2Tag()) {
+                            ID3v2 idTag = selectedSong.getId3v2Tag();
+                            songTitle = idTag.getTitle();
+                            if (songTitle == null) songTitle = "Unknown";
+                            songArtist = idTag.getArtist();
+                            if (songArtist == null) songArtist = "Unknown";
+                            songGenre = idTag.getGenreDescription();
+                            if (songGenre == null) songGenre = "Unknown";
+                            songAYear = idTag.getYear();
+                            if (songAYear == null) songAYear = "Unknown";
+                            songAlbum = idTag.getAlbum();
+                            if (songAlbum == null) songAlbum = "Unknown";
+                            songComment = idTag.getComment();
+                            if (songComment == null) songComment = "Unknown";
+                        }
+                        songTable.addSong(o);
+                        Object[] row = new Object[6];
+                        row[0] = songTitle;
+                        row[1] = songArtist;
+                        row[2] = songAlbum;
+                        row[3] = songGenre;
+                        row[4] = songAYear;
+                        row[5] = songComment;
+                        model.addRow(row);
+
+                    } catch (IOException ioException) {
+                        ioException.printStackTrace();
+                    } catch (UnsupportedTagException unsupportedTagException) {
+                        unsupportedTagException.printStackTrace();
+                    } catch (InvalidDataException invalidDataException) {
+                        invalidDataException.printStackTrace();
+                    } catch (SQLException throwables) {
+                        throwables.printStackTrace();
+                    }
                 }
-                songTable.getSongs(data);
             }
             catch (Exception ex){
                 ex.printStackTrace();
             }
         }
-
     }
 }
