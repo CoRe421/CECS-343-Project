@@ -4,6 +4,7 @@ import javazoom.jlgui.basicplayer.BasicPlayerException;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
+import javax.swing.tree.DefaultMutableTreeNode;
 import java.awt.*;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.dnd.DnDConstants;
@@ -19,7 +20,7 @@ import java.util.List;
 public class MyTunesGUI extends JFrame {
     BasicPlayer player;
 
-    JPanel mainPanel, buttonsPanel;
+    JPanel mainPanel, buttonsPanel, mainSongPanel, treePanel;
     JButton playButton, pauseButton, skipBackButton, skipForwardButton;
     JMenuItem addSongMenu, deleteSongMenu, addSongPopup, deleteSongPopup, openSong, exitGUI;
     JPopupMenu libPopUp;
@@ -27,6 +28,7 @@ public class MyTunesGUI extends JFrame {
     DefaultTableModel model = new DefaultTableModel();
     JMenuBar menuBar;
     JMenu fileMenu;
+    JTree playlistTree;
     JScrollPane scrollPane;
     int currentSelectedRow;
     int currentPlayingRow;
@@ -148,17 +150,39 @@ public class MyTunesGUI extends JFrame {
 
 
         this.setMinimumSize(new Dimension(300, 250));
-        table.setPreferredSize(new Dimension(getWidth(), getHeight()));
         buttonsPanel.setPreferredSize(new Dimension(getWidth(), 40));
         buttonsPanel.setMaximumSize(new Dimension(getWidth(), 40));
-        table.setPreferredSize(new Dimension(getWidth(), getHeight()));
 
         //Adds all the components to the panel.
+
+        treePanel = new JPanel();
+        mainSongPanel = new JPanel();
+        mainSongPanel.setLayout(new BoxLayout(mainSongPanel, BoxLayout.X_AXIS));
+        treePanel.setLayout(new FlowLayout(FlowLayout.LEFT));
+        treePanel.setBackground(Color.white);
+
+        DefaultMutableTreeNode root = new DefaultMutableTreeNode("Root");
+        DefaultMutableTreeNode playlistNode = new DefaultMutableTreeNode("Playlist");
+        playlistNode.add(new DefaultMutableTreeNode("Test"));
+        root.add(new DefaultMutableTreeNode("Library"));
+        root.add(playlistNode);
+        playlistTree = new JTree(root);
+        playlistTree.setRootVisible(false);
+        playlistTree.setMaximumSize(scrollPane.getPreferredSize());
+        treePanel.add(playlistTree);
+        treePanel.setMinimumSize(new Dimension(100, 200));
+        treePanel.setMaximumSize(new Dimension(100, 5000));
+        treePanel.setPreferredSize(new Dimension(100, 200));
+        playlistTree.setMinimumSize(new Dimension(treePanel.getWidth(), treePanel.getHeight()));
+
+        mainSongPanel.add(treePanel);
+        mainSongPanel.add(scrollPane);
+
         buttonsPanel.add(skipBackButton);
         buttonsPanel.add(playButton);
         buttonsPanel.add(pauseButton);
         buttonsPanel.add(skipForwardButton);
-        mainPanel.add(scrollPane);
+        mainPanel.add(mainSongPanel);
         mainPanel.add(buttonsPanel);
         fileMenu.add(addSongMenu);
         fileMenu.add(deleteSongMenu);
@@ -166,7 +190,7 @@ public class MyTunesGUI extends JFrame {
         fileMenu.add(exitGUI);
         menuBar.add(fileMenu);
         this.setJMenuBar(menuBar);
-        this.setTitle("StreamPlayer by Cory Reardon");//change the name to yours
+        this.setTitle("StreamPlayer");//change the name to yours
         this.setSize(600, 350);
         this.add(mainPanel);
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
