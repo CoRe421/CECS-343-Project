@@ -5,6 +5,7 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
 import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.DefaultTreeModel;
 import java.awt.*;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.dnd.DnDConstants;
@@ -20,15 +21,19 @@ import java.util.List;
 public class MyTunesGUI extends JFrame {
     BasicPlayer player;
 
-    JPanel mainPanel, buttonsPanel, mainSongPanel, treePanel;
-    JButton playButton, pauseButton, skipBackButton, skipForwardButton;
-    JMenuItem addSongMenu, deleteSongMenu, addSongPopup, deleteSongPopup, openSong, exitGUI;
-    JPopupMenu libPopUp;
+    JFrame plNameFrame;
+    JPanel mainPanel, buttonsPanel, mainSongPanel, treePanel, plNameMainPanel, plNameTopPanel, plNameBottomPanel;
+    JButton playButton, pauseButton, skipBackButton, skipForwardButton, plNameOKButton, plNameCancelButton;
+    JTextField plNameUserText;
+    JLabel plNameText;
+    JMenuItem addSongMenu, addSongPopup, deleteSongPopup, openSong, exitGUI, addPlaylistMenu, openPlaylistPopup, deletePlaylistPopup;
+    JPopupMenu libPopUp, playlistPopUp;
     JTable table;
     DefaultTableModel model = new DefaultTableModel();
     JMenuBar menuBar;
     JMenu fileMenu;
     JTree playlistTree;
+    DefaultMutableTreeNode root, playlistNode;
     JScrollPane scrollPane;
     int currentSelectedRow;
     int currentPlayingRow;
@@ -36,6 +41,7 @@ public class MyTunesGUI extends JFrame {
     RemoveSong removeAction;
     PlaySong playAction;
     ExitGUI exitAction;
+    AddPlaylist addPlaylist;
     PlayButtonListener playBL;
     PauseButtonListener pauseBL;
     SkipBackButtonListener skipBackBL;
@@ -81,21 +87,25 @@ public class MyTunesGUI extends JFrame {
         skipForwardButton.setMaximumSize(new Dimension(450, 25));
 
         fileMenu = new JMenu("File");
-        addSongMenu = new JMenuItem("Add a Song");
-        deleteSongMenu = new JMenuItem("Delete a Song");
-        openSong = new JMenuItem("Open a Song");
+        openSong = new JMenuItem("Open");
+        addSongMenu = new JMenuItem("Add File To Library");
+        addPlaylistMenu = new JMenuItem("New Playlist");
         exitGUI = new JMenuItem("Exit");
 
         addSongPopup = new JMenuItem("Add a Song");
         deleteSongPopup = new JMenuItem("Delete a Song");
 
+        openPlaylistPopup = new JMenuItem("Open in a new window");
+        deletePlaylistPopup = new JMenuItem("Delete Playlist");
+
         addAction = new AddSong();
         removeAction = new RemoveSong();
         playAction = new PlaySong();
         exitAction = new ExitGUI();
+        addPlaylist = new AddPlaylist();
 
         addSongMenu.addActionListener(addAction);
-        deleteSongMenu.addActionListener(removeAction);
+        addPlaylistMenu.addActionListener(addPlaylist);
         openSong.addActionListener(playAction);
         exitGUI.addActionListener(exitAction);
         addSongPopup.addActionListener(addAction);
@@ -104,6 +114,10 @@ public class MyTunesGUI extends JFrame {
         libPopUp = new JPopupMenu();
         libPopUp.add(addSongPopup);
         libPopUp.add(deleteSongPopup);
+
+        playlistPopUp = new JPopupMenu();
+        playlistPopUp.add(openPlaylistPopup);
+        playlistPopUp.add(deleteSongPopup);
 
 
         songTable.connect();
@@ -117,7 +131,7 @@ public class MyTunesGUI extends JFrame {
         showSongs();
 
         //Creates a new listener for the mouse attached to the table.
-        MouseListener mouseListener = new MouseAdapter() {
+        MouseListener mouseListenerTable = new MouseAdapter() {
             public void mousePressed(MouseEvent e) {
                 showPopup(e);
                 currentSelectedRow = table.getSelectedRow();
@@ -135,9 +149,25 @@ public class MyTunesGUI extends JFrame {
             }
         };
 
+        MouseListener mouseListenerTree = new MouseAdapter() {
+            public void mousePressed(MouseEvent e) {
+                showPopup(e);
+            }
+
+            public void mouseReleased(MouseEvent e) {
+                showPopup(e);
+            }
+
+            private void showPopup(MouseEvent e) {
+                if (e.isPopupTrigger()) {
+                    playlistPopUp.show(e.getComponent(), e.getX(), e.getY());
+                }
+            }
+        };
+
 
         //Attaches the mouseListener to the table.
-        table.addMouseListener(mouseListener);
+        table.addMouseListener(mouseListenerTable);
 
         table.setDropTarget(new MyDropTarget());
 
@@ -161,19 +191,20 @@ public class MyTunesGUI extends JFrame {
         treePanel.setLayout(new FlowLayout(FlowLayout.LEFT));
         treePanel.setBackground(Color.white);
 
-        DefaultMutableTreeNode root = new DefaultMutableTreeNode("Root");
-        DefaultMutableTreeNode playlistNode = new DefaultMutableTreeNode("Playlist");
-        playlistNode.add(new DefaultMutableTreeNode("Test"));
+        root = new DefaultMutableTreeNode("Root");
+        playlistNode = new DefaultMutableTreeNode("Playlist");
         root.add(new DefaultMutableTreeNode("Library"));
         root.add(playlistNode);
         playlistTree = new JTree(root);
         playlistTree.setRootVisible(false);
-        playlistTree.setMaximumSize(scrollPane.getPreferredSize());
+
+        playlistTree.addMouseListener(mouseListenerTree);
+
         treePanel.add(playlistTree);
         treePanel.setMinimumSize(new Dimension(100, 200));
         treePanel.setMaximumSize(new Dimension(100, 5000));
         treePanel.setPreferredSize(new Dimension(100, 200));
-        playlistTree.setMinimumSize(new Dimension(treePanel.getWidth(), treePanel.getHeight()));
+        playlistTree.setMaximumSize(new Dimension(treePanel.getWidth(), treePanel.getHeight()));
 
         mainSongPanel.add(treePanel);
         mainSongPanel.add(scrollPane);
@@ -184,9 +215,9 @@ public class MyTunesGUI extends JFrame {
         buttonsPanel.add(skipForwardButton);
         mainPanel.add(mainSongPanel);
         mainPanel.add(buttonsPanel);
-        fileMenu.add(addSongMenu);
-        fileMenu.add(deleteSongMenu);
         fileMenu.add(openSong);
+        fileMenu.add(addPlaylistMenu);
+        fileMenu.add(addSongMenu);
         fileMenu.add(exitGUI);
         menuBar.add(fileMenu);
         this.setJMenuBar(menuBar);
@@ -490,6 +521,74 @@ public class MyTunesGUI extends JFrame {
                 }
             }
 
+        }
+    }
+
+    class AddPlaylist implements ActionListener {
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            System.out.println("Adding a new playlist");
+            plNameFrame = new JFrame();
+            plNameFrame.setSize(350, 130);
+
+            plNameMainPanel = new JPanel();
+            plNameMainPanel.setLayout(new BoxLayout(plNameMainPanel, BoxLayout.Y_AXIS));
+            plNameTopPanel = new JPanel();
+            plNameTopPanel.setLayout(new BoxLayout(plNameTopPanel, BoxLayout.Y_AXIS));
+            plNameTopPanel.setPreferredSize(new Dimension(plNameFrame.getWidth(), plNameFrame.getHeight()));
+            plNameTopPanel.add(Box.createRigidArea(new Dimension(0, 10)));
+            plNameBottomPanel = new JPanel(new FlowLayout());
+            plNameBottomPanel.add(Box.createRigidArea(new Dimension(0, 20)));
+
+            plNameText = new JLabel("Playlist name:");
+            plNameText.setAlignmentX(plNameTopPanel.LEFT_ALIGNMENT);
+
+            plNameUserText = new JTextField();
+            plNameUserText.setMaximumSize(new Dimension(250, 20));
+            plNameUserText.setMinimumSize(new Dimension(250, 20));
+            plNameUserText.setAlignmentX(plNameUserText.LEFT_ALIGNMENT);
+
+            plNameTopPanel.add(plNameText);
+            plNameTopPanel.add(plNameUserText);
+
+            plNameOKButton = new JButton("OK");
+            plNameOKButton.setPreferredSize(new Dimension(74, 25));
+            plNameOKButton.addActionListener(new GetPLName());
+
+            plNameCancelButton = new JButton("Cancel");
+            plNameCancelButton.setPreferredSize(new Dimension(74, 25));
+            plNameCancelButton.addActionListener(new ClosePLName());
+
+            plNameBottomPanel.add(plNameOKButton);
+            plNameBottomPanel.add(plNameCancelButton);
+
+            plNameMainPanel.add(plNameTopPanel);
+            plNameMainPanel.add(plNameBottomPanel);
+            plNameFrame.add(plNameMainPanel);
+            plNameFrame.setTitle("Input");
+            plNameFrame.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
+            plNameFrame.setResizable(false);
+            plNameFrame.setVisible(true);
+        }
+    }
+
+    class GetPLName implements ActionListener {
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            DefaultTreeModel playlistTreeModel = (DefaultTreeModel)playlistTree.getModel();
+            String newplName = plNameUserText.getText();
+            playlistTreeModel.insertNodeInto(new DefaultMutableTreeNode(newplName), playlistNode, playlistNode.getChildCount());
+            plNameFrame.dispatchEvent(new WindowEvent(plNameFrame, WindowEvent.WINDOW_CLOSING));
+        }
+    }
+
+    class ClosePLName implements ActionListener {
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            plNameFrame.dispatchEvent(new WindowEvent(plNameFrame, WindowEvent.WINDOW_CLOSING));
         }
     }
 
