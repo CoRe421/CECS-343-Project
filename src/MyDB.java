@@ -44,6 +44,24 @@ public class MyDB {
         return songList;
     }
 
+    public ArrayList<Song> songList(String plName){
+        ArrayList<Song> songList = new ArrayList<>();
+        try{
+            connection = DriverManager.getConnection(url, user, password);
+            String sql = "SELECT * FROM Songs";
+            statement = connection.createStatement();
+            ResultSet rs = statement.executeQuery(sql);
+            Song song;
+            while (rs.next()){
+                song = new Song (rs.getString("Title"),rs.getString("Artist"),rs.getString("Album"),rs.getString("Genre"),rs.getString("Release Year"),rs.getString("Comment"));
+                songList.add(song);
+            }
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+        }
+        return songList;
+    }
+
     public void addSong(File song) throws InvalidDataException, IOException, UnsupportedTagException, SQLException {
         Mp3File selectedSong = new Mp3File(song);
         String sql = "INSERT INTO Songs VALUES (?, ?, ?, ?, ?, ?,?)";
