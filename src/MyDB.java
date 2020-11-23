@@ -48,14 +48,23 @@ public class MyDB {
         ArrayList<Song> songList = new ArrayList<>();
         try{
             connection = DriverManager.getConnection(url, user, password);
-            String sql = "SELECT * FROM Songs";
-            statement = connection.createStatement();
-            ResultSet rs = statement.executeQuery(sql);
-            Song song;
-            while (rs.next()){
-                song = new Song (rs.getString("Title"),rs.getString("Artist"),rs.getString("Album"),rs.getString("Genre"),rs.getString("Release Year"),rs.getString("Comment"));
-                songList.add(song);
+            String playListSQL = "SELECT SongID FROM `Playlist Songs` WHERE title = ?"; //Run a Query to get a list of songID's for a specific playlist
+            PreparedStatement playListPS = connection.prepareStatement(playListSQL);
+            playListPS.setString(1,plName);
+            ResultSet playListResults = playListPS.executeQuery(); //List of songsID for specific playlist
+            while(playListResults.next()){
+                String curSongID = playListResults.getString("SongID");
+                String SongSQL = "SELECT * FROM Songs WHERE SongID = ?"; // Run a Query to get all the song info based on the list of song IDs
+                PreparedStatement songPS = connection.prepareStatement(SongSQL);
+                songPS.setString(1,curSongID);
+                ResultSet songResults = songPS.executeQuery();
+                Song song;
+                while (songResults.next()){
+                    song = new Song (songResults.getString("Title"),songResults.getString("Artist"),songResults.getString("Album"),songResults.getString("Genre"),songResults.getString("Release Year"),songResults.getString("Comment"));
+                    songList.add(song);
+                }
             }
+
         } catch (SQLException throwables) {
             throwables.printStackTrace();
         }
@@ -132,12 +141,29 @@ public class MyDB {
     }
 
     public void addSongToPlayList(String playList, String songID) throws SQLException{
-        String sql = "INSERT INTO Playlist songs VALUE (?,?)";
+        String sql = "INSERT INTO `Playlist songs` VALUE (?,?)";
         connection = DriverManager.getConnection(url, user, password);
         preparedStatement = connection.prepareStatement(sql);
         preparedStatement.setString(1, playList);
         preparedStatement.setString(2, songID);
         preparedStatement.execute();
+    }
+
+    public ArrayList<String> getListOfPlaylist(){
+        ArrayList<String> ListOfPlayList = new ArrayList<>();
+        try{
+            connection = DriverManager.getConnection(url, user, password);
+            String sql = "SELECT * FROM Playlist";
+            statement = connection.createStatement();
+            ResultSet rs = statement.executeQuery(sql);
+            while (rs.next()){
+                String title = rs.getString("Title");
+                ListOfPlayList.add(title);
+            }
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+        }
+        return ListOfPlayList;
     }
 
 //    public void RemoveSong(File song) throws InvalidDataException, IOException, UnsupportedTagException, SQLException {

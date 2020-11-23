@@ -2,6 +2,8 @@ import com.mpatric.mp3agic.*;
 import javazoom.jlgui.basicplayer.BasicPlayer;
 import javazoom.jlgui.basicplayer.BasicPlayerException;
 import javax.swing.*;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
 import javax.swing.table.DefaultTableModel;
@@ -37,7 +39,6 @@ public class MyTunesGUI extends JFrame {
     JMenu fileMenu;
     JTree playlistTree;
     DefaultMutableTreeNode root, playlistNode;
-    JScrollPane scrollPane;
     int currentSelectedRow;
     int currentPlayingRow;
     AddSong addAction;
@@ -54,7 +55,7 @@ public class MyTunesGUI extends JFrame {
         menuBar = new JMenuBar();
 
         //Creates the panel with a vertical layout.
-        mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.Y_AXIS));
+        mainPanel.setLayout(new BorderLayout());
 
         fileMenu = new JMenu("File");
         openSong = new JMenuItem("Open");
@@ -97,12 +98,12 @@ public class MyTunesGUI extends JFrame {
 
         songTable = new SongTable();
 
-
         buttonsPanel = new ButtonPanel(songTable);
 
         this.setMinimumSize(new Dimension(300, 250));
         buttonsPanel.setPreferredSize(new Dimension(getWidth(), 40));
         buttonsPanel.setMaximumSize(new Dimension(getWidth(), 40));
+
 
         //Adds all the components to the panel.
 
@@ -133,6 +134,12 @@ public class MyTunesGUI extends JFrame {
         playlistNode = new DefaultMutableTreeNode("Playlist");
         root.add(new DefaultMutableTreeNode("Library"));
         root.add(playlistNode);
+
+        ArrayList<String> plNodes = songDB.getListOfPlaylist();
+        for (String node : plNodes) {
+            playlistNode.add(new DefaultMutableTreeNode(node));
+        }
+
         playlistTree = new JTree(root);
         playlistTree.setRootVisible(false);
         playlistTree.addMouseListener(mouseListenerTree);
@@ -147,7 +154,7 @@ public class MyTunesGUI extends JFrame {
         mainSongPanel.add(treePanel);
         mainSongPanel.add(songTable.getScrollPane());
         mainPanel.add(mainSongPanel);
-        mainPanel.add(buttonsPanel);
+        mainPanel.add(buttonsPanel, BorderLayout.SOUTH);
         fileMenu.add(openSong);
         fileMenu.add(AddPlaylistMenu);
         fileMenu.add(addSongMenu);
@@ -162,8 +169,13 @@ public class MyTunesGUI extends JFrame {
 
     class ButtonPanel extends JPanel {
         JButton playButton, pauseButton, skipBackButton, skipForwardButton;
+        SongTable givenTable;
+        JSlider slider;
 
-        public ButtonPanel(SongTable songTable) {
+        public ButtonPanel(SongTable givenSongTable) {
+            givenTable = givenSongTable;
+
+            this.setLayout(new BorderLayout());
 
             //Creates a Button Listener to attach to the playButton.
             playButton = new JButton("▶");
@@ -186,16 +198,44 @@ public class MyTunesGUI extends JFrame {
             skipForwardButton.setMinimumSize(new Dimension(450, 25));
             skipForwardButton.setMaximumSize(new Dimension(450, 25));
 
-            this.add(skipBackButton);
-            this.add(playButton);
-            this.add(pauseButton);
-            this.add(skipForwardButton);
+            slider = new JSlider(JSlider.HORIZONTAL, 0 , 100 ,100);
+            slider.setMajorTickSpacing(25);
+            slider.setPaintTicks(true);
+            event e = new event();
+            slider.addChangeListener(e);
+
+            slider.setPreferredSize(new Dimension(100, 10));
+            slider.setMaximumSize(new Dimension(100, 10));
+            slider.setMinimumSize(new Dimension(100, 10));
+
+            JPanel buttonHolderPanel = new JPanel();
+
+            buttonHolderPanel.add(skipBackButton);
+            buttonHolderPanel.add(playButton);
+            buttonHolderPanel.add(pauseButton);
+            buttonHolderPanel.add(skipForwardButton);
+            this.add(buttonHolderPanel);
+            this.add(slider, BorderLayout.EAST);
+            this.setBackground(Color.blue);
+
+        }
+
+        class event implements ChangeListener {
+            @Override
+            public void stateChanged(ChangeEvent e) {
+                double value = slider.getValue()/100.0;
+                try {
+                    player.setGain(value);
+                } catch (BasicPlayerException basicPlayerException) {
+                    basicPlayerException.printStackTrace();
+                }
+            }
         }
 
         class PlayButtonListener implements ActionListener {
             @Override
             public void actionPerformed(ActionEvent e) {
-                JTable table = songTable.getTable();
+                JTable table = givenTable.getTable();
                 if (player.getStatus() == 1) {
                     try {
                         player.resume();
@@ -265,7 +305,7 @@ public class MyTunesGUI extends JFrame {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                JTable table = songTable.getTable();
+                JTable table = givenTable.getTable();
                 File selectedSong;
                 String sql = "SELECT SongID FROM SONGS WHERE Title = ? AND Artist = ?";
                 if(currentPlayingRow == 0){
@@ -323,7 +363,7 @@ public class MyTunesGUI extends JFrame {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                JTable table = songTable.getTable();
+                JTable table = givenTable.getTable();
                 File selectedSong;
                 String sql = "SELECT SongID FROM SONGS WHERE Title = ? AND Artist = ?";
                 if(currentPlayingRow == table.getRowCount() - 1){
@@ -458,6 +498,66 @@ public class MyTunesGUI extends JFrame {
                 row[4] = list.get(i).getReleaseYear();
                 row[5] = list.get(i).getComment();
                 model.addRow(row);
+            }
+        }
+
+        class MyDropTarget extends DropTarget {
+            public  void drop(DropTargetDropEvent evt) {
+                try {
+                    evt.acceptDrop(DnDConstants.ACTION_COPY);
+                    List<File> result = (List) evt.getTransferable().getTransferData(DataFlavor.javaFileListFlavor);
+                    for(File o : result) {
+                        try {
+                            Mp3File selectedSong = new Mp3File(o);
+                            String songTitle = "", songArtist= "", songGenre= "", songAYear= "", songAlbum= "", songComment= "";
+                            if (selectedSong.hasId3v1Tag()) {
+                                ID3v1 idTag = selectedSong.getId3v1Tag();
+                                songTitle = idTag.getTitle();
+                                if (songTitle == null) songTitle = "Unknown";
+                                songArtist = idTag.getArtist();
+                                if (songArtist == null) songArtist = "Unknown";
+                                songGenre = idTag.getGenreDescription();
+                                if (songGenre == null) songGenre = "Unknown";
+                                songAYear = idTag.getYear();
+                                if (songAYear == null) songAYear = "Unknown";
+                                songAlbum = idTag.getAlbum();
+                                if (songAlbum == null) songAlbum = "Unknown";
+                                songComment = idTag.getComment();
+                                if (songComment == null) songComment = "Unknown";
+
+                            } else if (selectedSong.hasId3v2Tag()) {
+                                ID3v2 idTag = selectedSong.getId3v2Tag();
+                                songTitle = idTag.getTitle();
+                                if (songTitle == null) songTitle = "Unknown";
+                                songArtist = idTag.getArtist();
+                                if (songArtist == null) songArtist = "Unknown";
+                                songGenre = idTag.getGenreDescription();
+                                if (songGenre == null) songGenre = "Unknown";
+                                songAYear = idTag.getYear();
+                                if (songAYear == null) songAYear = "Unknown";
+                                songAlbum = idTag.getAlbum();
+                                if (songAlbum == null) songAlbum = "Unknown";
+                                songComment = idTag.getComment();
+                                if (songComment == null) songComment = "Unknown";
+                            }
+                            songDB.addSong(o);
+                            Object[] row = new Object[6];
+                            row[0] = songTitle;
+                            row[1] = songArtist;
+                            row[2] = songAlbum;
+                            row[3] = songGenre;
+                            row[4] = songAYear;
+                            row[5] = songComment;
+                            model.addRow(row);
+
+                        } catch (IOException | UnsupportedTagException | InvalidDataException | SQLException ioException) {
+                            ioException.printStackTrace();
+                        }
+                    }
+                }
+                catch (Exception ex){
+                    ex.printStackTrace();
+                }
             }
         }
 
@@ -692,6 +792,7 @@ public class MyTunesGUI extends JFrame {
         public void actionPerformed(ActionEvent e) {
             DefaultTreeModel playlistTreeModel = (DefaultTreeModel)playlistTree.getModel();
             String newPLName = plNameUserText.getText();
+
             playlistTreeModel.insertNodeInto(new DefaultMutableTreeNode(newPLName), playlistNode, playlistNode.getChildCount());
             plNameFrame.dispatchEvent(new WindowEvent(plNameFrame, WindowEvent.WINDOW_CLOSING));
         }
@@ -710,68 +811,6 @@ public class MyTunesGUI extends JFrame {
         @Override
         public void actionPerformed(ActionEvent e) {
             System.exit(0);
-        }
-    }
-
-
-
-    class MyDropTarget extends DropTarget {
-        public  void drop(DropTargetDropEvent evt) {
-            try {
-                evt.acceptDrop(DnDConstants.ACTION_COPY);
-                List<File> result = (List) evt.getTransferable().getTransferData(DataFlavor.javaFileListFlavor);
-                for(File o : result) {
-                    try {
-                        Mp3File selectedSong = new Mp3File(o);
-                        String songTitle = "", songArtist= "", songGenre= "", songAYear= "", songAlbum= "", songComment= "";
-                        if (selectedSong.hasId3v1Tag()) {
-                            ID3v1 idTag = selectedSong.getId3v1Tag();
-                            songTitle = idTag.getTitle();
-                            if (songTitle == null) songTitle = "Unknown";
-                            songArtist = idTag.getArtist();
-                            if (songArtist == null) songArtist = "Unknown";
-                            songGenre = idTag.getGenreDescription();
-                            if (songGenre == null) songGenre = "Unknown";
-                            songAYear = idTag.getYear();
-                            if (songAYear == null) songAYear = "Unknown";
-                            songAlbum = idTag.getAlbum();
-                            if (songAlbum == null) songAlbum = "Unknown";
-                            songComment = idTag.getComment();
-                            if (songComment == null) songComment = "Unknown";
-
-                        } else if (selectedSong.hasId3v2Tag()) {
-                            ID3v2 idTag = selectedSong.getId3v2Tag();
-                            songTitle = idTag.getTitle();
-                            if (songTitle == null) songTitle = "Unknown";
-                            songArtist = idTag.getArtist();
-                            if (songArtist == null) songArtist = "Unknown";
-                            songGenre = idTag.getGenreDescription();
-                            if (songGenre == null) songGenre = "Unknown";
-                            songAYear = idTag.getYear();
-                            if (songAYear == null) songAYear = "Unknown";
-                            songAlbum = idTag.getAlbum();
-                            if (songAlbum == null) songAlbum = "Unknown";
-                            songComment = idTag.getComment();
-                            if (songComment == null) songComment = "Unknown";
-                        }
-                        songDB.addSong(o);
-                        Object[] row = new Object[6];
-                        row[0] = songTitle;
-                        row[1] = songArtist;
-                        row[2] = songAlbum;
-                        row[3] = songGenre;
-                        row[4] = songAYear;
-                        row[5] = songComment;
-                        //model.addRow(row);
-
-                    } catch (IOException | UnsupportedTagException | InvalidDataException | SQLException ioException) {
-                        ioException.printStackTrace();
-                    }
-                }
-            }
-            catch (Exception ex){
-                ex.printStackTrace();
-            }
         }
     }
 }
