@@ -73,7 +73,7 @@ public class MyDB {
 
     public void addSong(File song) throws InvalidDataException, IOException, UnsupportedTagException, SQLException {
         Mp3File selectedSong = new Mp3File(song);
-        String sql = "INSERT INTO Songs VALUES (?, ?, ?, ?, ?, ?,?)";
+        String sql = "INSERT INTO Songs VALUES (?, ?, ?, ?, ?, ?, ?)";
         connection = DriverManager.getConnection(url, user, password);
         preparedStatement = connection.prepareStatement(sql);
         if (selectedSong.hasId3v1Tag()) {
@@ -132,8 +132,25 @@ public class MyDB {
         }
     }
 
+    public void removeSong(String songTitle, String songArtist) throws SQLException {
+        String sql = "DELETE FROM Songs WHERE Title = ? AND Artist = ?";
+        connection = DriverManager.getConnection(url, user, password);
+        preparedStatement = connection.prepareStatement(sql);
+        preparedStatement.setString(1, songTitle);
+        preparedStatement.setString(2, songArtist);
+        preparedStatement.execute();
+    }
+
     public void addPlayList(String playList) throws SQLException{
         String sql = "INSERT INTO Playlist VALUE (?)";
+        connection = DriverManager.getConnection(url, user, password);
+        preparedStatement = connection.prepareStatement(sql);
+        preparedStatement.setString(1, playList);
+        preparedStatement.execute();
+    }
+
+    public void deletePlayList(String playList) throws SQLException{
+        String sql = "DELETE FROM Playlist WHERE Title = ?";
         connection = DriverManager.getConnection(url, user, password);
         preparedStatement = connection.prepareStatement(sql);
         preparedStatement.setString(1, playList);
@@ -165,24 +182,5 @@ public class MyDB {
         }
         return ListOfPlayList;
     }
-
-//    public void RemoveSong(File song) throws InvalidDataException, IOException, UnsupportedTagException, SQLException {
-//        Mp3File selectedSong = new Mp3File(song);
-//        String sql = "DELETE FROM Songs WHERE SongID = ?";
-//        connection = DriverManager.getConnection(url, user, password);
-//        preparedStatement = connection.prepareStatement(sql);
-//        preparedStatement.setString(1, song.getAbsolutePath());
-//        preparedStatement.execute();
-//    }
-
-    public void removeSong(String songTitle, String songArtist) throws SQLException {
-        String sql = "DELETE FROM Songs WHERE Title = ? AND Artist = ?";
-        connection = DriverManager.getConnection(url, user, password);
-        preparedStatement = connection.prepareStatement(sql);
-        preparedStatement.setString(1, songTitle);
-        preparedStatement.setString(2, songArtist);
-        preparedStatement.execute();
-    }
-
 
 }

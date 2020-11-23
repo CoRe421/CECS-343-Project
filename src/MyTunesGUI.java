@@ -2,17 +2,18 @@ import com.mpatric.mp3agic.*;
 import javazoom.jlgui.basicplayer.BasicPlayer;
 import javazoom.jlgui.basicplayer.BasicPlayerException;
 import javax.swing.*;
-import javax.swing.event.ChangeEvent;
-import javax.swing.event.ChangeListener;
-import javax.swing.event.TreeSelectionEvent;
-import javax.swing.event.TreeSelectionListener;
+import javax.swing.event.*;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
+import javax.swing.tree.MutableTreeNode;
 import javax.swing.tree.TreePath;
+import javax.xml.crypto.Data;
 import java.awt.*;
 import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.StringSelection;
+import java.awt.datatransfer.Transferable;
 import java.awt.dnd.DnDConstants;
 import java.awt.dnd.DropTarget;
 import java.awt.dnd.DropTargetDropEvent;
@@ -36,7 +37,7 @@ public class MyTunesGUI extends JFrame {
     JMenuItem addSongMenu, addSongPopup, deleteSongPopup, openSong, exitGUI, AddPlaylistMenu, openPlaylistPopup, deletePlaylistPopup;
     JPopupMenu libPopUp, playlistPopUp;
     JMenuBar menuBar;
-    JMenu fileMenu;
+    JMenu fileMenu, addPlayListPopUp;
     JTree playlistTree;
     DefaultMutableTreeNode root, playlistNode;
     int currentSelectedRow;
@@ -47,6 +48,8 @@ public class MyTunesGUI extends JFrame {
     ExitGUI exitAction;
     OpenAddPlaylistWindow openAddPlaylistWindow;
     OpenPlaylistWindow openPlaylistWindow;
+    DeletePlaylist deletePlaylist;
+    String[] currentlyPlaying = new String[2];
     MyDB songDB = new MyDB();
 
     public MyTunesGUI() {
@@ -58,13 +61,14 @@ public class MyTunesGUI extends JFrame {
         mainPanel.setLayout(new BorderLayout());
 
         fileMenu = new JMenu("File");
+        addPlayListPopUp = new JMenu("Add to playlist");
         openSong = new JMenuItem("Open");
         addSongMenu = new JMenuItem("Add File To Library");
         AddPlaylistMenu = new JMenuItem("New Playlist");
         exitGUI = new JMenuItem("Exit");
 
-        addSongPopup = new JMenuItem("Add a Song");
-        deleteSongPopup = new JMenuItem("Delete a Song");
+        addSongPopup = new JMenuItem("Add song to Library");
+        deleteSongPopup = new JMenuItem("Delete currently selected song");
 
         openPlaylistPopup = new JMenuItem("Open in a new window");
         deletePlaylistPopup = new JMenuItem("Delete Playlist");
@@ -75,6 +79,7 @@ public class MyTunesGUI extends JFrame {
         exitAction = new ExitGUI();
         openAddPlaylistWindow = new OpenAddPlaylistWindow();
         openPlaylistWindow = new OpenPlaylistWindow();
+        deletePlaylist = new DeletePlaylist();
 
         addSongMenu.addActionListener(addAction);
         AddPlaylistMenu.addActionListener(openAddPlaylistWindow);
@@ -83,9 +88,11 @@ public class MyTunesGUI extends JFrame {
         addSongPopup.addActionListener(addAction);
         deleteSongPopup.addActionListener(removeAction);
         openPlaylistPopup.addActionListener(openPlaylistWindow);
+        deletePlaylistPopup.addActionListener(deletePlaylist);
 
         libPopUp = new JPopupMenu();
         libPopUp.add(addSongPopup);
+        libPopUp.add(addPlayListPopUp);
         libPopUp.add(deleteSongPopup);
 
         playlistPopUp = new JPopupMenu();
@@ -138,6 +145,9 @@ public class MyTunesGUI extends JFrame {
         ArrayList<String> plNodes = songDB.getListOfPlaylist();
         for (String node : plNodes) {
             playlistNode.add(new DefaultMutableTreeNode(node));
+            JMenuItem menuItem = new JMenuItem(node);
+            menuItem.addActionListener(new AddSongToPlaylist());
+            addPlayListPopUp.add(menuItem);
         }
 
         playlistTree = new JTree(root);
@@ -236,7 +246,7 @@ public class MyTunesGUI extends JFrame {
             @Override
             public void actionPerformed(ActionEvent e) {
                 JTable table = givenTable.getTable();
-                if (player.getStatus() == 1) {
+                if (player.getStatus() == 1 && ((currentlyPlaying[0] == table.getValueAt(currentSelectedRow,0)) && (currentlyPlaying[1] == table.getValueAt(currentSelectedRow,1)))) {
                     try {
                         player.resume();
                     } catch (BasicPlayerException basicPlayerException) {
@@ -248,6 +258,8 @@ public class MyTunesGUI extends JFrame {
                     if (table.getSelectedRow() != -1) {
                         String title = (String)table.getValueAt(currentSelectedRow,0);
                         String artist = (String)table.getValueAt(currentSelectedRow,1);
+                        currentlyPlaying[0] = title;
+                        currentlyPlaying[1] = artist;
                         String sql = "SELECT SongID FROM SONGS WHERE Title = ? AND Artist = ?";
                         try {
                             Connection connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/mytunes","root", "");
@@ -274,7 +286,6 @@ public class MyTunesGUI extends JFrame {
                         System.out.println("No row selected.");
                     }
                 }
-
             }
         }
 
@@ -431,17 +442,20 @@ public class MyTunesGUI extends JFrame {
             model = new DefaultTableModel();
             model.setColumnIdentifiers(columns);
             table = new JTable();
+            table.setDragEnabled(true);
             table.setModel(model);
-            showSongs();
+            showSongs(plName);
             //Attaches the mouseListener to the table.
             table.addMouseListener(mouseListenerTable);
 
+            table.setDropMode(DropMode.INSERT);
             table.setDropTarget(new MyDropTarget());
 
             //Sets the width of the URL column to be larger.
             TableColumn column = table.getColumnModel().getColumn(0);
             column.setPreferredWidth(250);
 
+            table.setTransferHandler(new Transfer());
             scrollPane = new JScrollPane(table);
         }
 
@@ -451,11 +465,13 @@ public class MyTunesGUI extends JFrame {
             model = new DefaultTableModel();
             model.setColumnIdentifiers(columns);
             table = new JTable();
+            table.setDragEnabled(true);
             table.setModel(model);
             showSongs(playlistName);
             //Attaches the mouseListener to the table.
             table.addMouseListener(mouseListenerTable);
 
+            table.setTransferHandler(new Transfer());
             table.setDropTarget(new MyDropTarget());
 
             //Sets the width of the URL column to be larger.
@@ -469,24 +485,15 @@ public class MyTunesGUI extends JFrame {
             return scrollPane;
         }
 
-        public void showSongs() {
-            ArrayList<Song> list = songDB.songList();;
-            DefaultTableModel model = (DefaultTableModel) table.getModel();
-            model.setRowCount(0);
-            Object[] row = new Object[6];
-            for (int i = 0 ; i < list.size() ; i ++) {
-                row[0] = list.get(i).getTitle();
-                row[1] = list.get(i).getArtist();
-                row[2] = list.get(i).getAlbum();
-                row[3] = list.get(i).getGenre();
-                row[4] = list.get(i).getReleaseYear();
-                row[5] = list.get(i).getComment();
-                model.addRow(row);
+        private void showSongs(String playlistName) {
+            plName = playlistName;
+            ArrayList<Song> list;
+            if (playlistName == null) {
+                list = songDB.songList();
             }
-        }
-
-        public void showSongs(String plName) {
-            ArrayList<Song> list = songDB.songList(plName);;
+            else {
+                list = songDB.songList(playlistName);
+            }
             DefaultTableModel model = (DefaultTableModel) table.getModel();
             model.setRowCount(0);
             Object[] row = new Object[6];
@@ -550,6 +557,11 @@ public class MyTunesGUI extends JFrame {
                             row[5] = songComment;
                             model.addRow(row);
 
+                            if (plName != null) {
+                                songDB.addSongToPlayList(plName, o.getAbsolutePath());
+                                System.out.println("Testing");
+                            }
+
                         } catch (IOException | UnsupportedTagException | InvalidDataException | SQLException ioException) {
                             ioException.printStackTrace();
                         }
@@ -557,12 +569,40 @@ public class MyTunesGUI extends JFrame {
                 }
                 catch (Exception ex){
                     ex.printStackTrace();
+                    System.out.println(evt.getTransferable());
                 }
             }
         }
 
-        public void updateTable() {
-            showSongs();
+        class Transfer extends TransferHandler {
+            public int getSourceActions(JComponent c) {
+                return COPY_OR_MOVE;
+            }
+            protected Transferable createTransferable(JComponent c) {
+                JTable table = (JTable)c;
+                return new StringSelection(table.getValueAt(table.getSelectedRow(), 0).toString());
+            }
+            public boolean canImport(TransferSupport supp) {
+                if (!supp.isDataFlavorSupported(DataFlavor.stringFlavor)) {
+                    return false;
+                }
+                return true;
+            }
+            public boolean importData(TransferSupport supp) {
+                if (!supp.isDrop()) {
+                    return false;
+                }
+                JTable table = (JTable)supp.getComponent();
+                String data;
+                try {
+                    data = (String)supp.getTransferable().getTransferData(DataFlavor.stringFlavor);
+                } catch (Exception e) {
+                    return false;
+                }
+                DefaultTableModel model = (DefaultTableModel)table.getModel();
+                System.out.println(data);
+                return true;
+            }
         }
 
         public void updateTable(String plName) {
@@ -601,14 +641,19 @@ public class MyTunesGUI extends JFrame {
 
         @Override
         public void valueChanged(TreeSelectionEvent e) {
-            DefaultMutableTreeNode selectedNode = (DefaultMutableTreeNode) playlistTree.getLastSelectedPathComponent();
-            if (!(selectedNode.toString().equals("Playlist"))) {
-                if (!(selectedNode.toString().equals("Library"))) {
-                    songTable.updateTable(selectedNode.toString());
+            try {
+                DefaultMutableTreeNode selectedNode = (DefaultMutableTreeNode) playlistTree.getLastSelectedPathComponent();
+                if (!(selectedNode.toString().equals("Playlist"))) {
+                    if (!(selectedNode.toString().equals("Library"))) {
+                        songTable.updateTable(selectedNode.toString());
+                    }
+                    else {
+                        songTable.updateTable(null);
+                    }
                 }
-                else {
-                    songTable.updateTable();
-                }
+            }
+            catch (NullPointerException err) {
+                playlistTree.setSelectionRow(0);
             }
         }
     }
@@ -766,23 +811,32 @@ public class MyTunesGUI extends JFrame {
 
         @Override
         public void actionPerformed(ActionEvent e) {
-            plWindowFrame = new JFrame();
-            plMainPanel = new JPanel();
-            plMainPanel.setLayout(new BoxLayout(plMainPanel, BoxLayout.Y_AXIS));
-            TreePath playlistName = playlistTree.getSelectionPath();
-            System.out.println(playlistName.getLastPathComponent().toString());
-            SongTable playlistTable = new SongTable(playlistName.getLastPathComponent().toString());
-            ButtonPanel playlistButtons = new ButtonPanel(playlistTable);
 
-            playlistButtons.setPreferredSize(new Dimension(getWidth(), 40));
-            playlistButtons.setMaximumSize(new Dimension(getWidth(), 40));
-            plMainPanel.add(playlistTable.getScrollPane());
-            plMainPanel.add(playlistButtons);
-            plWindowFrame.setTitle(playlistName.getLastPathComponent().toString());//change the name to yours
-            plWindowFrame.setSize(600, 350);
-            plWindowFrame.add(plMainPanel);
-            plWindowFrame.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
-            plWindowFrame.setVisible(true);
+            TreePath playlistName = playlistTree.getSelectionPath();
+            if (!(playlistName.getLastPathComponent().toString().equals("Playlist"))) {
+                if (!(playlistName.getLastPathComponent().toString().equals("Library"))) {
+                    plWindowFrame = new JFrame();
+                    plMainPanel = new JPanel();
+                    plMainPanel.setLayout(new BoxLayout(plMainPanel, BoxLayout.Y_AXIS));
+                    SongTable playlistTable = new SongTable(playlistName.getLastPathComponent().toString());
+                    ButtonPanel playlistButtons = new ButtonPanel(playlistTable);
+
+                    playlistButtons.setPreferredSize(new Dimension(getWidth(), 40));
+                    playlistButtons.setMaximumSize(new Dimension(getWidth(), 40));
+                    plMainPanel.add(playlistTable.getScrollPane());
+                    plMainPanel.add(playlistButtons);
+                    plWindowFrame.setTitle(playlistName.getLastPathComponent().toString());//change the name to yours
+                    plWindowFrame.setSize(600, 350);
+                    plWindowFrame.add(plMainPanel);
+                    plWindowFrame.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
+                    plWindowFrame.setVisible(true);
+
+                    playlistTree.setSelectionRow(0);
+                }
+                else {
+                    System.out.println("That action cannot be performed on base nodes");
+                }
+            }
         }
     }
 
@@ -793,8 +847,76 @@ public class MyTunesGUI extends JFrame {
             DefaultTreeModel playlistTreeModel = (DefaultTreeModel)playlistTree.getModel();
             String newPLName = plNameUserText.getText();
 
-            playlistTreeModel.insertNodeInto(new DefaultMutableTreeNode(newPLName), playlistNode, playlistNode.getChildCount());
+            DefaultMutableTreeNode newPlaylist = new DefaultMutableTreeNode(newPLName);
+            TreePath treePath = new TreePath(playlistNode);
+            playlistTree.setSelectionPath(treePath.pathByAddingChild(newPlaylist));
+
+            playlistTreeModel.insertNodeInto(newPlaylist, playlistNode, playlistNode.getChildCount());
+
+            try {
+                songDB.addPlayList(newPLName);
+            } catch (SQLException throwables) {
+                throwables.printStackTrace();
+            }
+
+
+            JMenuItem menuItem = new JMenuItem(newPLName);
+            menuItem.addActionListener(new AddSongToPlaylist());
+            addPlayListPopUp.add(menuItem);
+
             plNameFrame.dispatchEvent(new WindowEvent(plNameFrame, WindowEvent.WINDOW_CLOSING));
+        }
+    }
+
+    class DeletePlaylist implements ActionListener {
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            TreePath playlistName = playlistTree.getSelectionPath();
+            if (!(playlistName.getParentPath().equals(new TreePath(root)))) {
+                try {
+                    songDB.deletePlayList(playlistName.getLastPathComponent().toString());
+                } catch (SQLException throwables) {
+                    throwables.printStackTrace();
+                }
+
+                TreePath parentPath = new TreePath(playlistNode);
+                TreeModelEvent event = new TreeModelEvent(this, parentPath);
+
+
+                DefaultTreeModel playlistTreeModel = (DefaultTreeModel)playlistTree.getModel();
+                playlistTreeModel.removeNodeFromParent((MutableTreeNode)playlistName.getLastPathComponent());
+            }
+            else {
+                System.out.println("Cannot remove base nodes");
+            }
+        }
+    }
+
+    class AddSongToPlaylist implements ActionListener {
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            JMenuItem item = (JMenuItem)e.getSource();
+            JTable table = songTable.getTable();
+
+            String title = (String)table.getValueAt(currentSelectedRow,0);
+            String artist = (String)table.getValueAt(currentSelectedRow,1);
+            currentlyPlaying[0] = title;
+            currentlyPlaying[1] = artist;
+            String sql = "SELECT SongID FROM SONGS WHERE Title = ? AND Artist = ?";
+            try {
+                Connection connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/mytunes","root", "");
+                PreparedStatement preparedStatement = connection.prepareStatement(sql);
+                preparedStatement.setString(1,title);
+                preparedStatement.setString(2,artist);
+                ResultSet rs = preparedStatement.executeQuery();
+                rs.next();
+                String url = rs.getString("SongID");
+                songDB.addSongToPlayList(item.getText(), url);
+            } catch (SQLException throwables) {
+                throwables.printStackTrace();
+            }
         }
     }
 
