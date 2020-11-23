@@ -2,6 +2,8 @@ import com.mpatric.mp3agic.*;
 import javazoom.jlgui.basicplayer.BasicPlayer;
 import javazoom.jlgui.basicplayer.BasicPlayerException;
 import javax.swing.*;
+import javax.swing.event.TreeSelectionEvent;
+import javax.swing.event.TreeSelectionListener;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
 import javax.swing.tree.DefaultMutableTreeNode;
@@ -133,8 +135,8 @@ public class MyTunesGUI extends JFrame {
         root.add(playlistNode);
         playlistTree = new JTree(root);
         playlistTree.setRootVisible(false);
-
         playlistTree.addMouseListener(mouseListenerTree);
+        playlistTree.addTreeSelectionListener(new TablePlaylistChanger());
 
         treePanel.add(playlistTree);
         treePanel.setMinimumSize(new Dimension(100, 200));
@@ -410,7 +412,7 @@ public class MyTunesGUI extends JFrame {
             model.setColumnIdentifiers(columns);
             table = new JTable();
             table.setModel(model);
-            showSongs();
+            showSongs(playlistName);
             //Attaches the mouseListener to the table.
             table.addMouseListener(mouseListenerTable);
 
@@ -428,14 +430,9 @@ public class MyTunesGUI extends JFrame {
         }
 
         public void showSongs() {
-            ArrayList<Song> list;
-            if (plName != null) {
-                list = songDB.songList(plName);
-            }
-            else {
-                list = songDB.songList();
-            }
+            ArrayList<Song> list = songDB.songList();;
             DefaultTableModel model = (DefaultTableModel) table.getModel();
+            model.setRowCount(0);
             Object[] row = new Object[6];
             for (int i = 0 ; i < list.size() ; i ++) {
                 row[0] = list.get(i).getTitle();
@@ -446,6 +443,30 @@ public class MyTunesGUI extends JFrame {
                 row[5] = list.get(i).getComment();
                 model.addRow(row);
             }
+        }
+
+        public void showSongs(String plName) {
+            ArrayList<Song> list = songDB.songList(plName);;
+            DefaultTableModel model = (DefaultTableModel) table.getModel();
+            model.setRowCount(0);
+            Object[] row = new Object[6];
+            for (int i = 0 ; i < list.size() ; i ++) {
+                row[0] = list.get(i).getTitle();
+                row[1] = list.get(i).getArtist();
+                row[2] = list.get(i).getAlbum();
+                row[3] = list.get(i).getGenre();
+                row[4] = list.get(i).getReleaseYear();
+                row[5] = list.get(i).getComment();
+                model.addRow(row);
+            }
+        }
+
+        public void updateTable() {
+            showSongs();
+        }
+
+        public void updateTable(String plName) {
+            showSongs(plName);
         }
 
         public JTable getTable() {
@@ -474,6 +495,22 @@ public class MyTunesGUI extends JFrame {
                 }
             }
         };
+    }
+
+    class TablePlaylistChanger implements TreeSelectionListener {
+
+        @Override
+        public void valueChanged(TreeSelectionEvent e) {
+            DefaultMutableTreeNode selectedNode = (DefaultMutableTreeNode) playlistTree.getLastSelectedPathComponent();
+            if (!(selectedNode.toString().equals("Playlist"))) {
+                if (!(selectedNode.toString().equals("Library"))) {
+                    songTable.updateTable(selectedNode.toString());
+                }
+                else {
+                    songTable.updateTable();
+                }
+            }
+        }
     }
 
     class AddSong implements ActionListener {

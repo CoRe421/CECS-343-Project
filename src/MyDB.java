@@ -122,6 +122,24 @@ public class MyDB {
             System.out.println("Song type not compatible");
         }
     }
+
+    public void addPlayList(String playList) throws SQLException{
+        String sql = "INSERT INTO Playlist VALUE (?)";
+        connection = DriverManager.getConnection(url, user, password);
+        preparedStatement = connection.prepareStatement(sql);
+        preparedStatement.setString(1, playList);
+        preparedStatement.execute();
+    }
+
+    public void addSongToPlayList(String playList, String songID) throws SQLException{
+        String sql = "INSERT INTO Playlist songs VALUE (?,?)";
+        connection = DriverManager.getConnection(url, user, password);
+        preparedStatement = connection.prepareStatement(sql);
+        preparedStatement.setString(1, playList);
+        preparedStatement.setString(2, songID);
+        preparedStatement.execute();
+    }
+
 //    public void RemoveSong(File song) throws InvalidDataException, IOException, UnsupportedTagException, SQLException {
 //        Mp3File selectedSong = new Mp3File(song);
 //        String sql = "DELETE FROM Songs WHERE SongID = ?";
