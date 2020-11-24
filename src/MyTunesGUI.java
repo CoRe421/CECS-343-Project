@@ -463,6 +463,7 @@ public class MyTunesGUI extends JFrame {
             showSongs(plName);
             //Attaches the mouseListener to the table.
 
+            table.setFillsViewportHeight(true);
             table.setDragEnabled(true);
             table.setTransferHandler(new Transfer());
 
@@ -483,6 +484,7 @@ public class MyTunesGUI extends JFrame {
             showSongs(playlistName);
             //Attaches the mouseListener to the table.
 
+            table.setFillsViewportHeight(true);
             table.setDragEnabled(true);
             table.setTransferHandler(new Transfer());
 
@@ -524,83 +526,17 @@ public class MyTunesGUI extends JFrame {
             }
         }
 
-        /**
-        class MyDropTarget extends DropTarget {
-            public  void drop(DropTargetDropEvent evt) {
-                try {
-                    evt.acceptDrop(DnDConstants.ACTION_COPY);
-                    List<File> result = (List) evt.getTransferable().getTransferData(DataFlavor.javaFileListFlavor);
-                    for(File o : result) {
-                        try {
-                            Mp3File selectedSong = new Mp3File(o);
-                            String songTitle = "", songArtist= "", songGenre= "", songAYear= "", songAlbum= "", songComment= "";
-                            if (selectedSong.hasId3v1Tag()) {
-                                ID3v1 idTag = selectedSong.getId3v1Tag();
-                                songTitle = idTag.getTitle();
-                                if (songTitle == null) songTitle = "Unknown";
-                                songArtist = idTag.getArtist();
-                                if (songArtist == null) songArtist = "Unknown";
-                                songGenre = idTag.getGenreDescription();
-                                if (songGenre == null) songGenre = "Unknown";
-                                songAYear = idTag.getYear();
-                                if (songAYear == null) songAYear = "Unknown";
-                                songAlbum = idTag.getAlbum();
-                                if (songAlbum == null) songAlbum = "Unknown";
-                                songComment = idTag.getComment();
-                                if (songComment == null) songComment = "Unknown";
-
-                            } else if (selectedSong.hasId3v2Tag()) {
-                                ID3v2 idTag = selectedSong.getId3v2Tag();
-                                songTitle = idTag.getTitle();
-                                if (songTitle == null) songTitle = "Unknown";
-                                songArtist = idTag.getArtist();
-                                if (songArtist == null) songArtist = "Unknown";
-                                songGenre = idTag.getGenreDescription();
-                                if (songGenre == null) songGenre = "Unknown";
-                                songAYear = idTag.getYear();
-                                if (songAYear == null) songAYear = "Unknown";
-                                songAlbum = idTag.getAlbum();
-                                if (songAlbum == null) songAlbum = "Unknown";
-                                songComment = idTag.getComment();
-                                if (songComment == null) songComment = "Unknown";
-                            }
-                            Object[] row = new Object[6];
-                            row[0] = songTitle;
-                            row[1] = songArtist;
-                            row[2] = songAlbum;
-                            row[3] = songGenre;
-                            row[4] = songAYear;
-                            row[5] = songComment;
-                            model.addRow(row);
-                            songDB.addSong(o);
-                            if (plName != null) {
-                                songDB.addSongToPlayList(plName, o.getAbsolutePath());
-                                songTable.getModel().addRow(row);
-                            }
-
-                        } catch (IOException | UnsupportedTagException | InvalidDataException | SQLException ioException) {
-                            ioException.printStackTrace();
-                        }
-                    }
-                }
-                catch (Exception ex){
-                    ex.printStackTrace();
-                }
-            }
-        }
-        **/
-
         class Transfer extends TransferHandler {
-            public Transfer() {
-
-            }
-
             public boolean canImport(TransferHandler.TransferSupport support) {
                 return true;
             }
 
-            public int getSourceActions(JComponent component)
-            {
+            @Override
+            protected Transferable createTransferable(JComponent c) {
+                return new StringSelection("Eyo");
+            }
+
+            public int getSourceActions(JComponent component) {
                 //  AccessibleContext accessibleContext1 = component.getAccessibleContext();int[] selectedRows = table.getSelectedRows();
                 currentSelectedRows = table.getSelectedRows();
 
@@ -661,7 +597,10 @@ public class MyTunesGUI extends JFrame {
                                 }
                                 if (plName != null) {
                                     songDB.addSongToPlayList(plName, o.getAbsolutePath());
-                                    songTable.getModel().addRow(row);
+                                    if (songTable.getPlName() == null) {
+                                        songTable.updateTable(null);
+                                    }
+                                    updateTable(plName);
                                 }
                             } catch (IOException | UnsupportedTagException | InvalidDataException | SQLException ioException) {
                                 ioException.printStackTrace();
@@ -675,12 +614,15 @@ public class MyTunesGUI extends JFrame {
                 else {
                     JTable target = (JTable) supp.getComponent();
                     JTable mainTable = songTable.getTable();
-                    SongTable targetSongTable = (SongTable) supp.getComponent();
-                    DefaultTableModel targetModel = targetSongTable.getModel();
-                    JTable.DropLocation dropLocation = (JTable.DropLocation) supp.getDropLocation();
+                    SongTable targetSongTable = songTable;
+
+                    for (SongTable openTable : currentTables) {
+                        if (openTable.getTable().equals(target));
+                        targetSongTable = openTable;
+                    }
                     for (int currentRow : currentSelectedRows) {
                         String title = (String)mainTable.getValueAt(currentRow,0);
-                        String artist = (String)table.getValueAt(currentRow,1);
+                        String artist = (String)mainTable.getValueAt(currentRow,1);
                         String sql = "SELECT SongID FROM SONGS WHERE Title = ? AND Artist = ?";
                         try {
                             Connection connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/mytunes","root", "");
