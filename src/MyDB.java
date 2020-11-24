@@ -166,6 +166,15 @@ public class MyDB {
         preparedStatement.execute();
     }
 
+    public void deleteSongFromPlaylist(String playList, String songID) throws SQLException{
+        String sql = "DELETE FROM `Playlist Songs` WHERE Title = ? AND SongID = ?";
+        connection = DriverManager.getConnection(url, user, password);
+        preparedStatement = connection.prepareStatement(sql);
+        preparedStatement.setString(1, playList);
+        preparedStatement.setString(2, songID);
+        preparedStatement.execute();
+    }
+
     public ArrayList<String> getListOfPlaylist(){
         ArrayList<String> ListOfPlayList = new ArrayList<>();
         try{
