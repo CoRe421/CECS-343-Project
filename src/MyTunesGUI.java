@@ -974,32 +974,35 @@ public class MyTunesGUI extends JFrame {
         @Override
         public void actionPerformed(ActionEvent e) {
             TreePath playlistName = playlistTree.getSelectionPath();
-            if (!(playlistName.getParentPath().equals(new TreePath(root)))) {
-                try {
-                    songDB.deletePlayList(playlistName.getLastPathComponent().toString());
-                } catch (SQLException throwables) {
-                    throwables.printStackTrace();
-                }
-                Component[] playlistItems = addPlaylistPopUp.getMenuComponents();
-                Component[] plPlaylistItems = plAddPlaylistPopUp.getMenuComponents();
-                for (Component playlist : playlistItems) {
-                    JMenuItem tempItem = (JMenuItem)playlist;
-                    if (tempItem.getText().equals(playlistName.getLastPathComponent().toString())) {
-                        addPlaylistPopUp.remove(playlist);
+            int selection = JOptionPane.showConfirmDialog(null,"Are you sure you want to delete '" + playlistName.getLastPathComponent().toString() + "'?", "Delete Playlist", JOptionPane.YES_NO_OPTION);
+            if (selection == 0) {
+                if (!(playlistName.getParentPath().equals(new TreePath(root)))) {
+                    try {
+                        songDB.deletePlayList(playlistName.getLastPathComponent().toString());
+                    } catch (SQLException throwables) {
+                        throwables.printStackTrace();
                     }
-                }
-                for (Component playlist : plPlaylistItems) {
-                    JMenuItem tempItem = (JMenuItem)playlist;
-                    if (tempItem.getText().equals(playlistName.getLastPathComponent().toString())) {
-                        plAddPlaylistPopUp.remove(playlist);
+                    Component[] playlistItems = addPlaylistPopUp.getMenuComponents();
+                    Component[] plPlaylistItems = plAddPlaylistPopUp.getMenuComponents();
+                    for (Component playlist : playlistItems) {
+                        JMenuItem tempItem = (JMenuItem)playlist;
+                        if (tempItem.getText().equals(playlistName.getLastPathComponent().toString())) {
+                            addPlaylistPopUp.remove(playlist);
+                        }
                     }
-                }
+                    for (Component playlist : plPlaylistItems) {
+                        JMenuItem tempItem = (JMenuItem)playlist;
+                        if (tempItem.getText().equals(playlistName.getLastPathComponent().toString())) {
+                            plAddPlaylistPopUp.remove(playlist);
+                        }
+                    }
 
-                DefaultTreeModel playlistTreeModel = (DefaultTreeModel)playlistTree.getModel();
-                playlistTreeModel.removeNodeFromParent((MutableTreeNode)playlistName.getLastPathComponent());
-            }
-            else {
-                System.out.println("Cannot remove base nodes");
+                    DefaultTreeModel playlistTreeModel = (DefaultTreeModel)playlistTree.getModel();
+                    playlistTreeModel.removeNodeFromParent((MutableTreeNode)playlistName.getLastPathComponent());
+                }
+                else {
+                    System.out.println("Cannot remove base nodes");
+                }
             }
         }
     }
