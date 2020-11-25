@@ -36,7 +36,7 @@ public class MyTunesGUI extends JFrame {
     JButton plNameOKButton, plNameCancelButton;
     JTextField plNameUserText;
     JLabel plNameText;
-    JMenuItem addSongMenu, addSongPopup, deleteSongPopup, deleteSongFromPlaylistPopup, openSong, exitGUI, AddPlaylistMenu, openPlaylistPopup, deletePlaylistPopup, plOpenSong, plExit;
+    JMenuItem addSongMenu, addSongPopup, deleteSongPopup, deleteSongFromPlaylistPopup, openSong, exitGUI, AddPlaylistMenu, openPlaylistPopup, deletePlaylistPopup, plOpenSong, plAddSong, plExit;
     JPopupMenu libPopUp, playlistPopUp, plLibPopup;
     JMenuBar menuBar, plMenuBar;
     JMenu fileMenu, addPlaylistPopUp, plFileMenu, plAddPlaylistPopUp;
@@ -448,6 +448,8 @@ public class MyTunesGUI extends JFrame {
     }
 
     class SongTable extends ScrollPane {
+        JFrame plFrame;
+        JMenuBar plBar;
         JTable table;
         DefaultTableModel model;
         JScrollPane scrollPane;
@@ -474,9 +476,11 @@ public class MyTunesGUI extends JFrame {
             scrollPane = new JScrollPane(table);
         }
 
-        public SongTable(String playlistName) {
+        public SongTable(String playlistName, JFrame playlistFrame, JMenuBar playlistBar) {
             //songTable.getSongs(data);
             plName = playlistName;
+            plFrame = playlistFrame;
+            plBar = playlistBar;
             model = new DefaultTableModel();
             model.setColumnIdentifiers(columns);
             table = new JTable();
@@ -493,10 +497,6 @@ public class MyTunesGUI extends JFrame {
             column.setPreferredWidth(250);
 
             scrollPane = new JScrollPane(table);
-        }
-
-        public JScrollPane getScrollPane() {
-            return scrollPane;
         }
 
         private void showSongs(String playlistName) {
@@ -654,6 +654,10 @@ public class MyTunesGUI extends JFrame {
             }
         }
 
+        public JScrollPane getScrollPane() {
+            return scrollPane;
+        }
+
         public void updateTable(String plName) {
             showSongs(plName);
         }
@@ -668,6 +672,14 @@ public class MyTunesGUI extends JFrame {
 
         public DefaultTableModel getModel() {
             return model;
+        }
+
+        public JFrame getPlFrame() {
+            return plFrame;
+        }
+
+        public JMenuBar getPlBar() {
+            return plBar;
         }
 
         //Creates a new listener for the mouse attached to the table.
@@ -736,7 +748,6 @@ public class MyTunesGUI extends JFrame {
             DefaultTableModel model = songTable.getModel();
             JFileChooser fileChooser = new JFileChooser();
             fileChooser.setCurrentDirectory(new File(System.getProperty("user.home")));
-
             int result = fileChooser.showOpenDialog(fileMenu);
             if (result == JFileChooser.APPROVE_OPTION) {
                 File selectedFile = fileChooser.getSelectedFile();
@@ -782,7 +793,9 @@ public class MyTunesGUI extends JFrame {
                     row[3] = songGenre;
                     row[4] = songAYear;
                     row[5] = songComment;
-                    model.addRow(row);
+                    if (songTable.getPlName() == null) {
+                        model.addRow(row);
+                    }
 
                 } catch (IOException | InvalidDataException | UnsupportedTagException | SQLException ioException) {
                     ioException.printStackTrace();
@@ -892,19 +905,21 @@ public class MyTunesGUI extends JFrame {
                     plWindowFrame = new JFrame();
                     plMainPanel = new JPanel();
                     plMenuBar = new JMenuBar();
-                    plMainPanel.setLayout(new BoxLayout(plMainPanel, BoxLayout.Y_AXIS));
-                    SongTable playlistTable = new SongTable(playlistName.getLastPathComponent().toString());
+                    SongTable playlistTable = new SongTable(playlistName.getLastPathComponent().toString(), plWindowFrame, plMenuBar);
                     ButtonPanel playlistButtons = new ButtonPanel(playlistTable);
+                    plMainPanel.setLayout(new BoxLayout(plMainPanel, BoxLayout.Y_AXIS));
 
                     plOpenSong = new JMenuItem("Open");
-                    plExit = new JMenuItem("Exit");
+                    plAddSong = new JMenuItem("Add File to Library");
+                    plExit = new JMenuItem("Close");
                     plOpenSong.addActionListener(new PlaySong());
-                    plExit.addActionListener(new ExitGUI());
+                    plAddSong.addActionListener(new AddSong());
+                    plExit.addActionListener(new CloseGUI());
 
                     plFileMenu = new JMenu("File");
-                    plMenuBar = new JMenuBar();
 
                     plFileMenu.add(plOpenSong);
+                    plFileMenu.add(plAddSong);
                     plFileMenu.add(plExit);
 
                     playlistButtons.setPreferredSize(new Dimension(getWidth(), 40));
@@ -950,6 +965,11 @@ public class MyTunesGUI extends JFrame {
             playlistTree.setSelectionPath(treePath.pathByAddingChild(newPlaylist));
 
             playlistTreeModel.insertNodeInto(newPlaylist, playlistNode, playlistNode.getChildCount());
+
+            TreePath tp1 = new TreePath(playlistNode.getPath());
+            playlistTree.expandPath(tp1);
+
+            playlistTree.setSelectionPath(treePath.pathByAddingChild(newPlaylist));
 
             try {
                 songDB.addPlayList(newPLName);
@@ -999,6 +1019,12 @@ public class MyTunesGUI extends JFrame {
 
                     DefaultTreeModel playlistTreeModel = (DefaultTreeModel)playlistTree.getModel();
                     playlistTreeModel.removeNodeFromParent((MutableTreeNode)playlistName.getLastPathComponent());
+
+                    for (SongTable openTable : currentTables) {
+                        if (openTable.getPlName().equals(playlistName.getLastPathComponent().toString())) {
+                            openTable.getPlFrame().dispatchEvent(new WindowEvent(openTable.getPlFrame(), WindowEvent.WINDOW_CLOSING));
+                        }
+                    }
                 }
                 else {
                     System.out.println("Cannot remove base nodes");
@@ -1105,6 +1131,21 @@ public class MyTunesGUI extends JFrame {
         @Override
         public void actionPerformed(ActionEvent e) {
             plNameFrame.dispatchEvent(new WindowEvent(plNameFrame, WindowEvent.WINDOW_CLOSING));
+        }
+    }
+
+    class CloseGUI implements ActionListener {
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            JMenuItem closeItem = (JMenuItem)e.getSource();
+            JPopupMenu closePopupMenu = (JPopupMenu)closeItem.getParent();
+            JMenu closeMenu = (JMenu)closePopupMenu.getInvoker();
+            for (SongTable openTable : currentTables) {
+                if (openTable.getPlBar().getMenu(0).equals(closeMenu)) {
+                    openTable.getPlFrame().dispatchEvent(new WindowEvent(openTable.getPlFrame(), WindowEvent.WINDOW_CLOSING));
+                }
+            }
         }
     }
 
